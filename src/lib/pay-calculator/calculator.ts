@@ -446,8 +446,8 @@ export function calcMonth(
   let domN = 0, domS = 0, intlN = 0, intlS = 0;
   fl.forEach(f => {
     if (f.isDH) return;
-    if (f.isDom) { f.isSpecial ? domS++ : domN++; }
-    else         { f.isSpecial ? intlS++ : intlN++; }
+    if (f.isDom) { if (f.isSpecial) { domS++; } else { domN++; } }
+    else         { if (f.isSpecial) { intlS++; } else { intlN++; } }
   });
   const domLandPay  = domN * domLandN + domS * domLandS;
   const intlLandUSD = Math.ceil(intlN * intlLandN + intlS * intlLandS);
