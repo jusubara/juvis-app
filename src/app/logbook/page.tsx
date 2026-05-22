@@ -37,6 +37,9 @@ export default function LogbookPage() {
   const [entries, setEntries] = useState<LogbookEntry[]>([]);
   const [stats, setStats] = useState<LogbookStats | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [isSavingManual, setIsSavingManual] = useState(false);
+  const [manualSaveSuccess, setManualSaveSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function LogbookPage() {
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
+    setShowManualForm(false);
     const reader = new FileReader();
     reader.onload = (e) => setImagePreview(e.target?.result as string);
     reader.readAsDataURL(file);
@@ -129,6 +133,44 @@ export default function LogbookPage() {
     const updated = await deleteEntry(id);
     setEntries(updated);
     setStats(computeStats(updated));
+  };
+
+  const openManualForm = () => {
+    setEntry({ ...emptyEntry(), aircraft_type: 'B737' });
+    setShowManualForm(true);
+  };
+
+  const handleManualSave = async () => {
+    if (!entry.date || !entry.block_time) return;
+    setIsSavingManual(true);
+
+    const newEntry: LogbookEntry = {
+      id: crypto.randomUUID(),
+      date: entry.date!,
+      flight_number: entry.flight_number || '',
+      departure: entry.departure || '',
+      arrival: entry.arrival || '',
+      block_time: entry.block_time!,
+      night_time: entry.night_time || '00:00',
+      aircraft_type: entry.aircraft_type || '',
+      aircraft_reg: entry.aircraft_reg || '',
+      duty_code: entry.duty_code as DutyCode,
+      approach_type: entry.approach_type as ApproachType,
+      remarks: entry.remarks || '',
+      created_at: new Date().toISOString(),
+    };
+
+    const updated = await saveEntry(newEntry);
+    setEntries(updated);
+    setStats(computeStats(updated));
+    setIsSavingManual(false);
+    setManualSaveSuccess(true);
+
+    setTimeout(() => {
+      setManualSaveSuccess(false);
+      setShowManualForm(false);
+      setEntry(emptyEntry());
+    }, 1500);
   };
 
   const field = (key: keyof LogbookEntry, value: string) =>
@@ -233,30 +275,143 @@ export default function LogbookPage() {
           </div>
 
           {(step === 'upload') && (
-            <div
-              className={`juvis-card flex flex-col items-center justify-center min-h-48 cursor-pointer transition-all ${
-                isDragging ? 'border-cyan-400/80 bg-cyan-500/10' : ''
-              }`}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={onDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-              />
-              <div className="text-4xl mb-3">📷</div>
-              <p className="text-sm text-cyan-300 font-mono mb-1">
-                운항기록부 사진을 드래그하거나 클릭해서 업로드
-              </p>
-              <p className="text-xs text-cyan-600 font-mono">
-                JPG / PNG / WEBP — Claude Vision으로 자동 파싱
-              </p>
-            </div>
+            <>
+              <div
+                className={`juvis-card flex flex-col items-center justify-center min-h-48 cursor-pointer transition-all ${
+                  isDragging ? 'border-cyan-400/80 bg-cyan-500/10' : ''
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={onDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+                />
+                <div className="text-4xl mb-3">📷</div>
+                <p className="text-sm text-cyan-300 font-mono mb-1">
+                  운항기록부 사진을 드래그하거나 클릭해서 업로드
+                </p>
+                <p className="text-xs text-cyan-600 font-mono">
+                  JPG / PNG / WEBP — Claude Vision으로 자동 파싱
+                </p>
+              </div>
+
+              {/* Manual Entry Section */}
+              <div className="mt-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <button
+                    onClick={() => showManualForm ? setShowManualForm(false) : openManualForm()}
+                    className="flex items-center gap-2 text-xs font-mono text-cyan-500 hover:text-cyan-300 transition-colors"
+                  >
+                    <span className={`transition-transform duration-200 ${showManualForm ? 'rotate-90' : ''}`}>▶</span>
+                    직접 입력
+                  </button>
+                  <div className="flex-1 h-px bg-cyan-500/15" />
+                </div>
+
+                {showManualForm && (
+                  <div className="juvis-card">
+                    {manualSaveSuccess && (
+                      <div className="mb-4 px-3 py-2 rounded bg-emerald-500/10 border border-emerald-500/30">
+                        <p className="text-xs text-emerald-400 font-mono">저장되었습니다.</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {[
+                        { key: 'date', label: 'DATE', type: 'date', colSpan: '' },
+                        { key: 'flight_number', label: 'FLIGHT NO', type: 'text', colSpan: '' },
+                        { key: 'departure', label: 'DEP (ICAO)', type: 'text', colSpan: '' },
+                        { key: 'arrival', label: 'ARR (ICAO)', type: 'text', colSpan: '' },
+                        { key: 'block_time', label: 'BLOCK TIME (HH:MM)', type: 'text', colSpan: '' },
+                        { key: 'night_time', label: 'NIGHT TIME (HH:MM)', type: 'text', colSpan: '' },
+                        { key: 'aircraft_type', label: 'A/C TYPE', type: 'text', colSpan: '' },
+                      ].map(({ key, label, type }) => (
+                        <div key={key}>
+                          <label className="block text-[10px] font-mono text-cyan-600 mb-1 tracking-widest">
+                            {label}
+                          </label>
+                          <input
+                            type={type}
+                            value={(entry[key as keyof LogbookEntry] as string) || ''}
+                            onChange={(e) => field(key as keyof LogbookEntry, e.target.value)}
+                            className="w-full bg-[#020c14] border border-cyan-500/30 rounded px-2 py-1.5 text-xs text-cyan-200 font-mono focus:outline-none focus:border-cyan-400/60"
+                            placeholder={label}
+                            maxLength={key === 'departure' || key === 'arrival' ? 4 : undefined}
+                          />
+                        </div>
+                      ))}
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-cyan-600 mb-1 tracking-widest">
+                          DUTY CODE
+                        </label>
+                        <select
+                          value={entry.duty_code || ''}
+                          onChange={(e) => field('duty_code', e.target.value)}
+                          className="w-full bg-[#020c14] border border-cyan-500/30 rounded px-2 py-1.5 text-xs text-cyan-200 font-mono focus:outline-none focus:border-cyan-400/60"
+                        >
+                          <option value="">선택...</option>
+                          {Object.entries(DUTY_CODE_LABELS).map(([v, l]) => (
+                            <option key={v} value={v}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono text-cyan-600 mb-1 tracking-widest">
+                          APPROACH
+                        </label>
+                        <select
+                          value={entry.approach_type || ''}
+                          onChange={(e) => field('approach_type', e.target.value)}
+                          className="w-full bg-[#020c14] border border-cyan-500/30 rounded px-2 py-1.5 text-xs text-cyan-200 font-mono focus:outline-none focus:border-cyan-400/60"
+                        >
+                          <option value="">선택...</option>
+                          {Object.entries(APPROACH_TYPE_LABELS).map(([v, l]) => (
+                            <option key={v} value={v}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="col-span-2 md:col-span-3">
+                        <label className="block text-[10px] font-mono text-cyan-600 mb-1 tracking-widest">
+                          REMARKS
+                        </label>
+                        <input
+                          type="text"
+                          value={entry.remarks || ''}
+                          onChange={(e) => field('remarks', e.target.value)}
+                          className="w-full bg-[#020c14] border border-cyan-500/30 rounded px-2 py-1.5 text-xs text-cyan-200 font-mono focus:outline-none focus:border-cyan-400/60"
+                          placeholder="REMARKS"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={handleManualSave}
+                        disabled={isSavingManual || !entry.date || !entry.block_time}
+                        className="flex-1 py-2 rounded border border-cyan-400/60 bg-cyan-500/10 text-xs font-mono text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isSavingManual ? '저장 중...' : 'SAVE ENTRY'}
+                      </button>
+                      <button
+                        onClick={() => { setShowManualForm(false); setEntry(emptyEntry()); }}
+                        className="px-4 py-2 rounded border border-cyan-500/20 text-xs font-mono text-cyan-600 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors"
+                      >
+                        CANCEL
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           {step === 'parsing' && (
