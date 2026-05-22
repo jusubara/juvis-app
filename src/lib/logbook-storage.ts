@@ -28,6 +28,15 @@ export async function saveEntry(entry: LogbookEntry): Promise<LogbookEntry[]> {
   return loadEntries();
 }
 
+export async function bulkSaveEntries(entries: LogbookEntry[]): Promise<LogbookEntry[]> {
+  const { error } = await supabase
+    .from('logbook_entries')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .upsert(entries as any, { onConflict: 'id' });
+  if (error) throw new Error(error.message);
+  return loadEntries();
+}
+
 export async function deleteEntry(id: string): Promise<LogbookEntry[]> {
   const { error } = await supabase
     .from('logbook_entries')

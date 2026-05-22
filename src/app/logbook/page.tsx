@@ -7,10 +7,13 @@ import {
   loadEntries,
   saveEntry,
   deleteEntry,
+  bulkSaveEntries,
   computeStats,
   formatMinutesToTime,
   LogbookStats,
 } from '@/lib/logbook-storage';
+import { downloadCSVLocally, csvToEntries } from '@/lib/google-drive';
+import GoogleDriveSync, { GoogleDriveSyncHandle } from '@/components/logbook/GoogleDriveSync';
 
 type Step = 'upload' | 'parsing' | 'review' | 'saving';
 
@@ -37,10 +40,26 @@ export default function LogbookPage() {
   const [entries, setEntries] = useState<LogbookEntry[]>([]);
   const [stats, setStats] = useState<LogbookStats | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [offlineSave, setOfflineSave] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [isSavingManual, setIsSavingManual] = useState(false);
   const [manualSaveSuccess, setManualSaveSuccess] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvImportRef = useRef<HTMLInputElement>(null);
+  const driveRef = useRef<GoogleDriveSyncHandle>(null);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     loadEntries().then((loaded) => {
@@ -116,10 +135,23 @@ export default function LogbookPage() {
       created_at: new Date().toISOString(),
     };
 
+    if (!isOnline) {
+      downloadCSVLocally([...entries, newEntry]);
+      setOfflineSave(true);
+      setTimeout(() => {
+        setOfflineSave(false);
+        setStep('upload');
+        setEntry(emptyEntry());
+        setImagePreview(null);
+      }, 2000);
+      return;
+    }
+
     const updated = await saveEntry(newEntry);
     setEntries(updated);
     setStats(computeStats(updated));
     setSaveSuccess(true);
+    driveRef.current?.sync(updated);
 
     setTimeout(() => {
       setSaveSuccess(false);
@@ -160,17 +192,53 @@ export default function LogbookPage() {
       created_at: new Date().toISOString(),
     };
 
+    if (!isOnline) {
+      setIsSavingManual(false);
+      downloadCSVLocally([...entries, newEntry]);
+      setOfflineSave(true);
+      setTimeout(() => {
+        setOfflineSave(false);
+        setShowManualForm(false);
+        setEntry(emptyEntry());
+      }, 2000);
+      return;
+    }
+
     const updated = await saveEntry(newEntry);
     setEntries(updated);
     setStats(computeStats(updated));
     setIsSavingManual(false);
     setManualSaveSuccess(true);
+    driveRef.current?.sync(updated);
 
     setTimeout(() => {
       setManualSaveSuccess(false);
       setShowManualForm(false);
       setEntry(emptyEntry());
     }, 1500);
+  };
+
+  const handleCSVImport = async (file: File) => {
+    const text = await file.text();
+    const imported = csvToEntries(text);
+    if (!imported.length) return;
+    try {
+      const updated = await bulkSaveEntries(imported);
+      setEntries(updated);
+      setStats(computeStats(updated));
+    } catch (err) {
+      alert('CSV 가져오기에 실패했습니다: ' + (err instanceof Error ? err.message : ''));
+    }
+  };
+
+  const handleDriveImport = async (imported: LogbookEntry[]) => {
+    try {
+      const updated = await bulkSaveEntries(imported);
+      setEntries(updated);
+      setStats(computeStats(updated));
+    } catch (err) {
+      alert('Drive 가져오기에 실패했습니다: ' + (err instanceof Error ? err.message : ''));
+    }
   };
 
   const field = (key: keyof LogbookEntry, value: string) =>
@@ -197,7 +265,7 @@ export default function LogbookPage() {
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -213,11 +281,63 @@ export default function LogbookPage() {
               <p className="text-[10px] text-cyan-600 font-mono">Electronic Flight Log System</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <div
+                className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'}`}
+              />
+              <span className={`text-[10px] font-mono ${isOnline ? 'text-emerald-500' : 'text-red-400'}`}>
+                {isOnline ? 'ONLINE' : 'OFFLINE'}
+              </span>
+            </div>
+            <div className="w-px h-3 bg-cyan-500/20" />
             <div className="status-dot" />
             <span className="text-xs font-mono text-cyan-400">ACTIVE</span>
           </div>
         </header>
+
+        {/* Sync & Export Toolbar */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 rounded border border-cyan-500/15 bg-cyan-500/[0.03]">
+          {/* Google Drive */}
+          <GoogleDriveSync ref={driveRef} onImport={handleDriveImport} />
+
+          {/* CSV buttons */}
+          <div className="flex items-center gap-2">
+            <input
+              ref={csvImportRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleCSVImport(f);
+                e.target.value = '';
+              }}
+            />
+            <button
+              onClick={() => entries.length > 0 && downloadCSVLocally(entries)}
+              disabled={entries.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-cyan-500/20 text-[10px] font-mono text-cyan-600 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ↓ EXPORT CSV
+            </button>
+            <button
+              onClick={() => csvImportRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-cyan-500/20 text-[10px] font-mono text-cyan-600 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors"
+            >
+              ↑ IMPORT CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Offline notice */}
+        {offlineSave && (
+          <div className="mb-4 px-3 py-2 rounded border border-yellow-500/40 bg-yellow-500/10">
+            <p className="text-xs font-mono text-yellow-400">
+              오프라인 상태 — CSV 파일로 로컬 저장되었습니다.
+            </p>
+          </div>
+        )}
 
         {/* Stats */}
         {stats && (
@@ -269,18 +389,27 @@ export default function LogbookPage() {
         <section className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-xs font-mono text-cyan-600 tracking-widest uppercase">
-              {step === 'upload' ? 'New Entry' : step === 'parsing' ? 'Parsing...' : step === 'review' ? 'Review & Confirm' : 'Saving...'}
+              {step === 'upload'
+                ? 'New Entry'
+                : step === 'parsing'
+                ? 'Parsing...'
+                : step === 'review'
+                ? 'Review & Confirm'
+                : 'Saving...'}
             </span>
             <div className="flex-1 h-px bg-cyan-500/15" />
           </div>
 
-          {(step === 'upload') && (
+          {step === 'upload' && (
             <>
               <div
                 className={`juvis-card flex flex-col items-center justify-center min-h-48 cursor-pointer transition-all ${
                   isDragging ? 'border-cyan-400/80 bg-cyan-500/10' : ''
                 }`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={onDrop}
                 onClick={() => fileInputRef.current?.click()}
@@ -290,7 +419,10 @@ export default function LogbookPage() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
                 />
                 <div className="text-4xl mb-3">📷</div>
                 <p className="text-sm text-cyan-300 font-mono mb-1">
@@ -305,10 +437,14 @@ export default function LogbookPage() {
               <div className="mt-4">
                 <div className="flex items-center gap-3 mb-3">
                   <button
-                    onClick={() => showManualForm ? setShowManualForm(false) : openManualForm()}
+                    onClick={() => (showManualForm ? setShowManualForm(false) : openManualForm())}
                     className="flex items-center gap-2 text-xs font-mono text-cyan-500 hover:text-cyan-300 transition-colors"
                   >
-                    <span className={`transition-transform duration-200 ${showManualForm ? 'rotate-90' : ''}`}>▶</span>
+                    <span
+                      className={`transition-transform duration-200 ${showManualForm ? 'rotate-90' : ''}`}
+                    >
+                      ▶
+                    </span>
                     직접 입력
                   </button>
                   <div className="flex-1 h-px bg-cyan-500/15" />
@@ -324,13 +460,13 @@ export default function LogbookPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {[
-                        { key: 'date', label: 'DATE', type: 'date', colSpan: '' },
-                        { key: 'flight_number', label: 'FLIGHT NO', type: 'text', colSpan: '' },
-                        { key: 'departure', label: 'DEP (ICAO)', type: 'text', colSpan: '' },
-                        { key: 'arrival', label: 'ARR (ICAO)', type: 'text', colSpan: '' },
-                        { key: 'block_time', label: 'BLOCK TIME (HH:MM)', type: 'text', colSpan: '' },
-                        { key: 'night_time', label: 'NIGHT TIME (HH:MM)', type: 'text', colSpan: '' },
-                        { key: 'aircraft_type', label: 'A/C TYPE', type: 'text', colSpan: '' },
+                        { key: 'date', label: 'DATE', type: 'date' },
+                        { key: 'flight_number', label: 'FLIGHT NO', type: 'text' },
+                        { key: 'departure', label: 'DEP (ICAO)', type: 'text' },
+                        { key: 'arrival', label: 'ARR (ICAO)', type: 'text' },
+                        { key: 'block_time', label: 'BLOCK TIME (HH:MM)', type: 'text' },
+                        { key: 'night_time', label: 'NIGHT TIME (HH:MM)', type: 'text' },
+                        { key: 'aircraft_type', label: 'A/C TYPE', type: 'text' },
                       ].map(({ key, label, type }) => (
                         <div key={key}>
                           <label className="block text-[10px] font-mono text-cyan-600 mb-1 tracking-widest">
@@ -342,7 +478,9 @@ export default function LogbookPage() {
                             onChange={(e) => field(key as keyof LogbookEntry, e.target.value)}
                             className="w-full bg-[#020c14] border border-cyan-500/30 rounded px-2 py-1.5 text-xs text-cyan-200 font-mono focus:outline-none focus:border-cyan-400/60"
                             placeholder={label}
-                            maxLength={key === 'departure' || key === 'arrival' ? 4 : undefined}
+                            maxLength={
+                              key === 'departure' || key === 'arrival' ? 4 : undefined
+                            }
                           />
                         </div>
                       ))}
@@ -358,7 +496,9 @@ export default function LogbookPage() {
                         >
                           <option value="">선택...</option>
                           {Object.entries(DUTY_CODE_LABELS).map(([v, l]) => (
-                            <option key={v} value={v}>{l}</option>
+                            <option key={v} value={v}>
+                              {l}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -374,7 +514,9 @@ export default function LogbookPage() {
                         >
                           <option value="">선택...</option>
                           {Object.entries(APPROACH_TYPE_LABELS).map(([v, l]) => (
-                            <option key={v} value={v}>{l}</option>
+                            <option key={v} value={v}>
+                              {l}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -399,10 +541,17 @@ export default function LogbookPage() {
                         disabled={isSavingManual || !entry.date || !entry.block_time}
                         className="flex-1 py-2 rounded border border-cyan-400/60 bg-cyan-500/10 text-xs font-mono text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        {isSavingManual ? '저장 중...' : 'SAVE ENTRY'}
+                        {isSavingManual
+                          ? '저장 중...'
+                          : isOnline
+                          ? 'SAVE ENTRY'
+                          : 'SAVE AS CSV (OFFLINE)'}
                       </button>
                       <button
-                        onClick={() => { setShowManualForm(false); setEntry(emptyEntry()); }}
+                        onClick={() => {
+                          setShowManualForm(false);
+                          setEntry(emptyEntry());
+                        }}
                         className="px-4 py-2 rounded border border-cyan-500/20 text-xs font-mono text-cyan-600 hover:text-cyan-400 hover:border-cyan-500/40 transition-colors"
                       >
                         CANCEL
@@ -433,7 +582,11 @@ export default function LogbookPage() {
               <div className="juvis-card flex items-center justify-center">
                 {imagePreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imagePreview} alt="logbook" className="max-w-full max-h-80 rounded object-contain" />
+                  <img
+                    src={imagePreview}
+                    alt="logbook"
+                    className="max-w-full max-h-80 rounded object-contain"
+                  />
                 ) : (
                   <p className="text-xs text-cyan-700 font-mono">미리보기 없음</p>
                 )}
@@ -444,7 +597,9 @@ export default function LogbookPage() {
                 {parseError && (
                   <div className="mb-4 px-3 py-2 rounded bg-red-500/10 border border-red-500/30">
                     <p className="text-xs text-red-400 font-mono">{parseError}</p>
-                    <p className="text-[10px] text-red-600 font-mono mt-1">아래 필드를 직접 입력해 주세요.</p>
+                    <p className="text-[10px] text-red-600 font-mono mt-1">
+                      아래 필드를 직접 입력해 주세요.
+                    </p>
                   </div>
                 )}
                 {saveSuccess && (
@@ -452,9 +607,15 @@ export default function LogbookPage() {
                     <p className="text-xs text-emerald-400 font-mono">저장되었습니다.</p>
                   </div>
                 )}
+                {offlineSave && (
+                  <div className="mb-4 px-3 py-2 rounded bg-yellow-500/10 border border-yellow-500/30">
+                    <p className="text-xs text-yellow-400 font-mono">
+                      오프라인 — CSV로 저장되었습니다.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
-                  {/* Auto-parsed fields */}
                   {[
                     { key: 'date', label: 'DATE', type: 'date' },
                     { key: 'flight_number', label: 'FLIGHT NO', type: 'text' },
@@ -479,7 +640,6 @@ export default function LogbookPage() {
                     </div>
                   ))}
 
-                  {/* User-selected fields */}
                   <div>
                     <label className="block text-[10px] font-mono text-cyan-600 mb-1 tracking-widest">
                       DUTY CODE
@@ -491,7 +651,9 @@ export default function LogbookPage() {
                     >
                       <option value="">선택...</option>
                       {Object.entries(DUTY_CODE_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -507,7 +669,9 @@ export default function LogbookPage() {
                     >
                       <option value="">선택...</option>
                       {Object.entries(APPROACH_TYPE_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -531,7 +695,11 @@ export default function LogbookPage() {
                     disabled={step === 'saving' || !entry.date || !entry.block_time}
                     className="flex-1 py-2 rounded border border-cyan-400/60 bg-cyan-500/10 text-xs font-mono text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    {step === 'saving' ? '저장 중...' : 'SAVE ENTRY'}
+                    {step === 'saving'
+                      ? '저장 중...'
+                      : isOnline
+                      ? 'SAVE ENTRY'
+                      : 'SAVE AS CSV (OFFLINE)'}
                   </button>
                   <button
                     onClick={() => {
@@ -554,7 +722,9 @@ export default function LogbookPage() {
         {entries.length > 0 && (
           <section>
             <div className="flex items-center gap-3 mb-4">
-              <span className="text-xs font-mono text-cyan-600 tracking-widest uppercase">Flight Records</span>
+              <span className="text-xs font-mono text-cyan-600 tracking-widest uppercase">
+                Flight Records
+              </span>
               <div className="flex-1 h-px bg-cyan-500/15" />
               <span className="text-xs font-mono text-cyan-700">{entries.length} entries</span>
             </div>
@@ -564,11 +734,16 @@ export default function LogbookPage() {
                 <table className="w-full text-xs font-mono">
                   <thead>
                     <tr className="border-b border-cyan-500/20">
-                      {['DATE', 'FLIGHT', 'ROUTE', 'BLOCK', 'NIGHT', 'A/C', 'DUTY', 'APCH', ''].map((h) => (
-                        <th key={h} className="px-3 py-2 text-left text-[10px] text-cyan-600 tracking-widest whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
+                      {['DATE', 'FLIGHT', 'ROUTE', 'BLOCK', 'NIGHT', 'A/C', 'DUTY', 'APCH', ''].map(
+                        (h) => (
+                          <th
+                            key={h}
+                            className="px-3 py-2 text-left text-[10px] text-cyan-600 tracking-widest whitespace-nowrap"
+                          >
+                            {h}
+                          </th>
+                        )
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -580,17 +755,29 @@ export default function LogbookPage() {
                         }`}
                       >
                         <td className="px-3 py-2 text-cyan-400 whitespace-nowrap">{e.date}</td>
-                        <td className="px-3 py-2 text-cyan-200 whitespace-nowrap">{e.flight_number || '—'}</td>
+                        <td className="px-3 py-2 text-cyan-200 whitespace-nowrap">
+                          {e.flight_number || '—'}
+                        </td>
                         <td className="px-3 py-2 text-cyan-300 whitespace-nowrap">
                           {e.departure && e.arrival ? `${e.departure}→${e.arrival}` : '—'}
                         </td>
-                        <td className="px-3 py-2 text-cyan-200 whitespace-nowrap">{e.block_time || '—'}</td>
-                        <td className="px-3 py-2 text-cyan-600 whitespace-nowrap">{e.night_time || '—'}</td>
-                        <td className="px-3 py-2 text-cyan-600 whitespace-nowrap">{e.aircraft_type || '—'}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400">{e.duty_code || '—'}</span>
+                        <td className="px-3 py-2 text-cyan-200 whitespace-nowrap">
+                          {e.block_time || '—'}
                         </td>
-                        <td className="px-3 py-2 text-cyan-600 whitespace-nowrap">{e.approach_type || '—'}</td>
+                        <td className="px-3 py-2 text-cyan-600 whitespace-nowrap">
+                          {e.night_time || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-cyan-600 whitespace-nowrap">
+                          {e.aircraft_type || '—'}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400">
+                            {e.duty_code || '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-cyan-600 whitespace-nowrap">
+                          {e.approach_type || '—'}
+                        </td>
                         <td className="px-3 py-2">
                           <button
                             onClick={() => handleDelete(e.id)}
@@ -611,7 +798,7 @@ export default function LogbookPage() {
 
         <footer className="mt-8 pt-4 border-t border-cyan-500/10 text-center">
           <p className="text-[10px] font-mono text-cyan-700">
-            DATA SYNCED TO SUPABASE CLOUD
+            {isOnline ? 'DATA SYNCED TO SUPABASE CLOUD' : 'OFFLINE MODE — LOCAL CSV ONLY'}
           </p>
         </footer>
       </div>
