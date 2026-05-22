@@ -40,9 +40,10 @@ export default function LogbookPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const loaded = loadEntries();
-    setEntries(loaded);
-    setStats(computeStats(loaded));
+    loadEntries().then((loaded) => {
+      setEntries(loaded);
+      setStats(computeStats(loaded));
+    });
   }, []);
 
   const handleFile = useCallback((file: File) => {
@@ -111,7 +112,7 @@ export default function LogbookPage() {
       created_at: new Date().toISOString(),
     };
 
-    const updated = saveEntry(newEntry);
+    const updated = await saveEntry(newEntry);
     setEntries(updated);
     setStats(computeStats(updated));
     setSaveSuccess(true);
@@ -124,8 +125,8 @@ export default function LogbookPage() {
     }, 1500);
   };
 
-  const handleDelete = (id: string) => {
-    const updated = deleteEntry(id);
+  const handleDelete = async (id: string) => {
+    const updated = await deleteEntry(id);
     setEntries(updated);
     setStats(computeStats(updated));
   };
@@ -455,7 +456,7 @@ export default function LogbookPage() {
 
         <footer className="mt-8 pt-4 border-t border-cyan-500/10 text-center">
           <p className="text-[10px] font-mono text-cyan-700">
-            DATA STORED LOCALLY — Supabase 연동 시 클라우드 동기화 예정
+            DATA SYNCED TO SUPABASE CLOUD
           </p>
         </footer>
       </div>
