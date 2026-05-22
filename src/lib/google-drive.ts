@@ -1,11 +1,11 @@
-import { LogbookEntry } from '@/types/logbook';
+import { EastarEntry } from '@/types/logbook';
 
-const DRIVE_FILE_NAME = 'JUVIS_logbook.csv';
+const DRIVE_FILE_NAME = 'JUVIS_logbook_eastar.csv';
 
-const CSV_HEADERS: (keyof LogbookEntry)[] = [
-  'id', 'date', 'flight_number', 'departure', 'arrival',
-  'block_time', 'night_time', 'aircraft_type', 'aircraft_reg',
-  'duty_code', 'approach_type', 'remarks', 'created_at',
+const CSV_HEADERS: (keyof EastarEntry)[] = [
+  'id', 'date', 'ac_type', 'ac_ident', 'from_apt', 'to_apt', 'flt_no',
+  'pic', 'picus', 'cop', 'ip', 'tr', 'block', 'night', 'inst',
+  'app_type', 'to_d', 'to_n', 'ld_d', 'ld_n', 'remarks', 'created_at',
 ];
 
 function escapeCSV(val: string): string {
@@ -15,7 +15,7 @@ function escapeCSV(val: string): string {
   return val;
 }
 
-export function entriesToCSV(entries: LogbookEntry[]): string {
+export function entriesToCSV(entries: EastarEntry[]): string {
   const rows = entries.map((e) =>
     CSV_HEADERS.map((h) => escapeCSV(String(e[h] ?? ''))).join(',')
   );
@@ -29,15 +29,10 @@ function parseCSVLine(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') {
-      if (inQ && line[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else {
-        inQ = !inQ;
-      }
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQ = !inQ; }
     } else if (ch === ',' && !inQ) {
-      result.push(cur);
-      cur = '';
+      result.push(cur); cur = '';
     } else {
       cur += ch;
     }
@@ -46,20 +41,25 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
-export function csvToEntries(csv: string): LogbookEntry[] {
+export function csvToEntries(csv: string): EastarEntry[] {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
   return lines.slice(1).map((line) => {
     const cols = parseCSVLine(line);
-    const entry: Record<string, string> = {};
+    const entry: Record<string, unknown> = {};
     CSV_HEADERS.forEach((h, i) => {
-      entry[h as string] = cols[i] ?? '';
+      const val = cols[i] ?? '';
+      if (h === 'to_d' || h === 'to_n' || h === 'ld_d' || h === 'ld_n') {
+        entry[h as string] = val === 'true' || val === '1';
+      } else {
+        entry[h as string] = val;
+      }
     });
-    return entry as unknown as LogbookEntry;
+    return entry as unknown as EastarEntry;
   });
 }
 
-export function downloadCSVLocally(entries: LogbookEntry[]): void {
+export function downloadCSVLocally(entries: EastarEntry[]): void {
   const csv = entriesToCSV(entries);
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -81,7 +81,7 @@ async function findFileId(token: string): Promise<string | null> {
   return (data.files as { id: string }[])?.[0]?.id ?? null;
 }
 
-export async function syncToDrive(token: string, entries: LogbookEntry[]): Promise<void> {
+export async function syncToDrive(token: string, entries: EastarEntry[]): Promise<void> {
   const csv = entriesToCSV(entries);
   const csvBlob = new Blob([csv], { type: 'text/csv' });
   const fileId = await findFileId(token);
@@ -109,10 +109,9 @@ export async function syncToDrive(token: string, entries: LogbookEntry[]): Promi
   }
 }
 
-export async function importFromDrive(token: string): Promise<LogbookEntry[] | null> {
+export async function importFromDrive(token: string): Promise<EastarEntry[] | null> {
   const fileId = await findFileId(token);
   if (!fileId) return null;
-
   const res = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
     { headers: { Authorization: `Bearer ${token}` } }
