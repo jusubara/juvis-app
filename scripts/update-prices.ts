@@ -24,11 +24,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Holding {
+  id: string;
   ticker: string;
-  quantity: number;
-  avg_cost: number;
+  qty: number;
+  avg_price: number;
   currency: string;
-  group_id: string;
+  group_code: string;
 }
 
 interface PriceMap {
@@ -101,19 +102,22 @@ async function main() {
   // 1. Load holdings from Supabase
   const { data: holdings, error: hErr } = await supabase
     .from('holdings')
-    .select('ticker, quantity, avg_cost, currency, group_id');
+    .select('id, ticker, qty, avg_price, currency, group_code');
   if (hErr) throw new Error(`Holdings fetch failed: ${hErr.message}`);
   if (!holdings || holdings.length === 0) {
     console.log('No holdings found. Exiting.');
     return;
   }
 
+  // Tickers always fetched from Upbit (KRW)
+  const UPBIT_ONLY = new Set(['BTC', 'ETH', 'SOL', 'XRP', 'DOGE']);
+
   // Separate tickers by currency type
   const usdTickers: string[] = [];
   const cryptoTickers: string[] = [];
 
   for (const h of holdings as Holding[]) {
-    if (h.currency === 'KRW' && !h.ticker.startsWith('KRW-')) {
+    if (UPBIT_ONLY.has(h.ticker) || (h.currency === 'KRW' && !h.ticker.startsWith('KRW-'))) {
       // KRW-denominated crypto on Upbit
       cryptoTickers.push(h.ticker);
     } else {
@@ -136,29 +140,46 @@ async function main() {
   console.log(`[FX] USD/KRW = ${usdkrw}`);
 
   // 3. Build price_snapshots upsert payload
-  const snapshotRows: Array<{ ticker: string; price: number; currency: string; fetched_at: string }> = [];
+  const snapshotRows: Array<{
+    holding_id: string;
+    snapshot_date: string;
+    current_price: number;
+    eval_krw: number;
+    usd_krw_rate: number;
+  }> = [];
 
-  for (const [ticker, { price, currency }] of Object.entries(yahooPrices)) {
-    snapshotRows.push({ ticker, price, currency, fetched_at: now });
-  }
-  for (const [ticker, { price, currency }] of Object.entries(upbitPrices)) {
-    snapshotRows.push({ ticker, price, currency, fetched_at: now });
+  for (const h of holdings as Holding[]) {
+    const isUpbit =
+      UPBIT_ONLY.has(h.ticker) || (h.currency === 'KRW' && !h.ticker.startsWith('KRW-'));
+    const priceInfo = isUpbit ? upbitPrices[h.ticker] : yahooPrices[h.ticker];
+    if (!priceInfo) continue;
+
+    const toKrw = priceInfo.currency === 'USD' ? usdkrw : 1;
+    const eval_krw = priceInfo.price * h.qty * toKrw;
+
+    snapshotRows.push({
+      holding_id: h.id,
+      snapshot_date: today,
+      current_price: priceInfo.price,
+      eval_krw,
+      usd_krw_rate: usdkrw,
+    });
   }
 
   if (snapshotRows.length > 0) {
     const { error: snapErr } = await supabase
       .from('price_snapshots')
-      .upsert(snapshotRows, { onConflict: 'ticker' });
+      .upsert(snapshotRows, { onConflict: 'holding_id,snapshot_date' });
     if (snapErr) console.error('price_snapshots upsert error:', snapErr.message);
     else console.log(`Upserted ${snapshotRows.length} price snapshots.`);
   }
 
-  // 4. Compute portfolio_daily per group
-  const groupTotals: Record<string, { value_krw: number; cost_krw: number }> = {};
+  // 4. Compute portfolio_daily (single row per day)
+  let total_krw = 0;
 
   for (const h of holdings as Holding[]) {
     const priceInfo =
-      h.currency === 'KRW' && !h.ticker.startsWith('KRW-')
+      UPBIT_ONLY.has(h.ticker) || (h.currency === 'KRW' && !h.ticker.startsWith('KRW-'))
         ? upbitPrices[h.ticker]
         : yahooPrices[h.ticker];
 
@@ -168,27 +189,16 @@ async function main() {
     }
 
     const toKrw = priceInfo.currency === 'USD' ? usdkrw : 1;
-    const value_krw = priceInfo.price * h.quantity * toKrw;
-    const cost_krw = h.avg_cost * h.quantity * toKrw;
-
-    if (!groupTotals[h.group_id]) groupTotals[h.group_id] = { value_krw: 0, cost_krw: 0 };
-    groupTotals[h.group_id].value_krw += value_krw;
-    groupTotals[h.group_id].cost_krw += cost_krw;
+    total_krw += priceInfo.price * h.qty * toKrw;
   }
 
-  const dailyRows = Object.entries(groupTotals).map(([group_id, { value_krw, cost_krw }]) => {
-    const pnl_krw = value_krw - cost_krw;
-    const pnl_pct = cost_krw > 0 ? (pnl_krw / cost_krw) * 100 : 0;
-    return { date: today, group_id, total_value_krw: value_krw, total_cost_krw: cost_krw, pnl_krw, pnl_pct };
-  });
+  const dailyRow = { snapshot_date: today, total_krw, usd_krw_rate: usdkrw, fund_krw: 0, memo: null };
 
-  if (dailyRows.length > 0) {
-    const { error: dailyErr } = await supabase
-      .from('portfolio_daily')
-      .upsert(dailyRows, { onConflict: 'date,group_id' });
-    if (dailyErr) console.error('portfolio_daily upsert error:', dailyErr.message);
-    else console.log(`Upserted ${dailyRows.length} portfolio_daily rows.`);
-  }
+  const { error: dailyErr } = await supabase
+    .from('portfolio_daily')
+    .upsert(dailyRow, { onConflict: 'snapshot_date' });
+  if (dailyErr) console.error('portfolio_daily upsert error:', dailyErr.message);
+  else console.log(`Upserted portfolio_daily for ${today}: total_krw=${Math.round(total_krw).toLocaleString()}`);
 
   console.log('=== Done ===');
 }

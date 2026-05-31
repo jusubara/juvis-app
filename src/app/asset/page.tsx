@@ -65,7 +65,7 @@ function SectionHeader({ title }: { title: string }) {
 export default function AssetPage() {
   const [summary, setSummary] = useState<GroupSummary[]>([]);
   const [holdings, setHoldings] = useState<LatestHolding[]>([]);
-  const [total, setTotal] = useState<{ total_value_krw: number; total_cost_krw: number; pnl_krw: number; pnl_pct: number } | null>(null);
+  const [total, setTotal] = useState<{ cur_krw: number; total_cost_krw: number; pnl_krw: number; pnl_pct: number } | null>(null);
   const [realized, setRealized] = useState<RealizedPnl[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,8 +180,8 @@ export default function AssetPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 label="총 자산 (KRW)"
-                value={total ? `₩${fmtKrw(total.total_value_krw)}` : '—'}
-                sub={total ? fmtKrwFull(total.total_value_krw) : undefined}
+                value={total ? `₩${fmtKrw(total.cur_krw)}` : '—'}
+                sub={total ? fmtKrwFull(total.cur_krw) : undefined}
               />
               <StatCard
                 label="총 투자금"
@@ -224,7 +224,7 @@ export default function AssetPage() {
                       <div className="space-y-1 text-xs font-mono">
                         <div className="flex justify-between">
                           <span className="text-cyan-600">평가금액</span>
-                          <span className="text-cyan-200">₩{fmtKrw(g.total_value_krw)}</span>
+                          <span className="text-cyan-200">₩{fmtKrw(g.cur_krw)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-cyan-600">투자금</span>

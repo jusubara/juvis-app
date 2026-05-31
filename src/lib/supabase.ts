@@ -34,7 +34,7 @@ export interface PortfolioDaily {
   id: string;
   date: string;
   group_id: string;
-  total_value_krw: number;
+  cur_krw: number;
   total_cost_krw: number;
   pnl_krw: number;
   pnl_pct: number;
@@ -57,7 +57,7 @@ export interface GroupSummary {
   group_id: string;
   name: string;
   type: string;
-  total_value_krw: number;
+  cur_krw: number;
   total_cost_krw: number;
   pnl_krw: number;
   pnl_pct: number;
@@ -132,8 +132,8 @@ export async function fetchGroupSummary(): Promise<GroupSummary[]> {
   const { data, error } = await supabase
     .from('v_group_summary')
     .select('*')
-    .order('total_value_krw', { ascending: false });
-  if (error) throw error;
+    .order('cur_krw', { ascending: false });
+  if (error) throw new Error(error.message);
   return (data ?? []) as GroupSummary[];
 }
 
@@ -142,18 +142,18 @@ export async function fetchLatestHoldings(): Promise<LatestHolding[]> {
     .from('v_latest_holdings')
     .select('*')
     .order('current_value_krw', { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as LatestHolding[];
 }
 
-export async function fetchLatestTotal(): Promise<{ total_value_krw: number; total_cost_krw: number; pnl_krw: number; pnl_pct: number } | null> {
+export async function fetchLatestTotal(): Promise<{ cur_krw: number; total_cost_krw: number; pnl_krw: number; pnl_pct: number } | null> {
   const { data, error } = await supabase
     .from('portfolio_daily')
-    .select('total_value_krw, total_cost_krw, pnl_krw, pnl_pct, date')
+    .select('cur_krw, total_cost_krw, pnl_krw, pnl_pct, date')
     .order('date', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data;
 }
 
@@ -162,6 +162,6 @@ export async function fetchRealizedPnl(): Promise<RealizedPnl[]> {
     .from('realized_pnl')
     .select('*')
     .order('sell_date', { ascending: false });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return (data ?? []) as RealizedPnl[];
 }
