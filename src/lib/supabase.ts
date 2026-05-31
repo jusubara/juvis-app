@@ -4,78 +4,90 @@ import { EastarEntry } from '@/types/logbook';
 // ─── Asset Management Types ───────────────────────────────────────────────────
 
 export interface AssetGroup {
-  group_id: string;
-  name: string;
-  type: 'stock' | 'crypto' | 'etf' | 'bond' | 'cash' | string;
-  currency: string;
+  id: string;
+  code: string;
+  name_ko: string;
+  target_pct: number;
+  sort_order: number;
   note?: string;
+  created_at: string;
 }
 
 export interface Holding {
   id: string;
-  group_id: string;
-  ticker: string;
+  group_code: string;
+  account: string;
+  sector: string;
   name: string;
-  quantity: number;
-  avg_cost: number;
+  ticker: string;
   currency: string;
+  qty: number;
+  avg_price: number;
+  is_active: boolean;
   note?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PriceSnapshot {
   id: string;
-  ticker: string;
-  price: number;
-  currency: string;
-  fetched_at: string;
+  holding_id: string;
+  snapshot_date: string;
+  current_price: number;
+  eval_krw: number;
+  usd_krw_rate: number;
+  created_at: string;
 }
 
 export interface PortfolioDaily {
   id: string;
-  date: string;
-  group_id: string;
-  cur_krw: number;
-  total_cost_krw: number;
-  pnl_krw: number;
-  pnl_pct: number;
+  snapshot_date: string;
+  total_krw: number;
+  usd_krw_rate: number;
+  fund_krw: number;
+  memo?: string;
+  created_at: string;
 }
 
 export interface RealizedPnl {
   id: string;
-  ticker: string;
-  name?: string;
+  asset_type: string;
+  name: string;
   sell_date: string;
-  quantity: number;
-  avg_cost: number;
-  sell_price: number;
-  currency: string;
+  cost_krw: number;
+  proceeds_krw: number;
   pnl_krw: number;
-  group_id?: string;
+  revenge_target?: string;
+  revenge_pct?: number;
+  lesson?: string;
+  created_at?: string;
 }
 
 export interface GroupSummary {
-  group_id: string;
-  name: string;
-  type: string;
+  code: string;
+  name_ko: string;
+  target_pct: number;
+  sort_order: number;
   cur_krw: number;
-  total_cost_krw: number;
-  pnl_krw: number;
-  pnl_pct: number;
+  holding_count: number;
 }
 
 export interface LatestHolding {
-  ticker: string;
-  name: string;
-  group_id: string;
+  id: string;
+  group_code: string;
   group_name: string;
-  quantity: number;
-  avg_cost: number;
+  account: string;
+  sector: string;
+  name: string;
+  ticker: string;
   currency: string;
+  qty: number;
+  avg_price: number;
   current_price: number;
-  current_value_krw: number;
-  cost_krw: number;
-  pnl_krw: number;
-  pnl_pct: number;
+  eval_krw: number;
+  snapshot_date: string;
+  usd_krw_rate: number;
+  ror: number;
 }
 
 // Supabase table: eastar_entries
@@ -141,20 +153,21 @@ export async function fetchLatestHoldings(): Promise<LatestHolding[]> {
   const { data, error } = await supabase
     .from('v_latest_holdings')
     .select('*')
-    .order('current_value_krw', { ascending: false });
+    .order('eval_krw', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as LatestHolding[];
 }
 
-export async function fetchLatestTotal(): Promise<{ cur_krw: number; total_cost_krw: number; pnl_krw: number; pnl_pct: number } | null> {
+export async function fetchLatestTotal(): Promise<{ cur_krw: number } | null> {
   const { data, error } = await supabase
     .from('portfolio_daily')
-    .select('cur_krw, total_cost_krw, pnl_krw, pnl_pct, date')
-    .order('date', { ascending: false })
+    .select('total_krw')
+    .order('snapshot_date', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data;
+  if (!data) return null;
+  return { cur_krw: (data as { total_krw: number }).total_krw };
 }
 
 export async function fetchRealizedPnl(): Promise<RealizedPnl[]> {

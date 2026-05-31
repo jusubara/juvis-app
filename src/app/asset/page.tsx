@@ -31,14 +31,6 @@ function pnlColor(v: number) {
   return 'text-cyan-400';
 }
 
-const GROUP_TYPE_LABEL: Record<string, string> = {
-  stock: 'STOCK',
-  crypto: 'CRYPTO',
-  etf: 'ETF',
-  bond: 'BOND',
-  cash: 'CASH',
-};
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({ label, value, sub, subColor }: { label: string; value: string; sub?: string; subColor?: string }) {
@@ -65,7 +57,7 @@ function SectionHeader({ title }: { title: string }) {
 export default function AssetPage() {
   const [summary, setSummary] = useState<GroupSummary[]>([]);
   const [holdings, setHoldings] = useState<LatestHolding[]>([]);
-  const [total, setTotal] = useState<{ cur_krw: number; total_cost_krw: number; pnl_krw: number; pnl_pct: number } | null>(null);
+  const [total, setTotal] = useState<{ cur_krw: number } | null>(null);
   const [realized, setRealized] = useState<RealizedPnl[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,11 +89,11 @@ export default function AssetPage() {
 
   const filteredHoldings = groupFilter === 'ALL'
     ? holdings
-    : holdings.filter(h => h.group_id === groupFilter);
+    : holdings.filter(h => h.group_code === groupFilter);
 
   const totalRealizedPnl = realized.reduce((acc, r) => acc + r.pnl_krw, 0);
 
-  const groups = summary.map(s => ({ id: s.group_id, name: s.name }));
+  const groups = summary.map(s => ({ id: s.code, name: s.name_ko }));
 
   return (
     <main className="min-h-screen grid-bg relative">
@@ -184,20 +176,20 @@ export default function AssetPage() {
                 sub={total ? fmtKrwFull(total.cur_krw) : undefined}
               />
               <StatCard
-                label="총 투자금"
-                value={total ? `₩${fmtKrw(total.total_cost_krw)}` : '—'}
-                sub={total ? fmtKrwFull(total.total_cost_krw) : undefined}
+                label="보유 종목"
+                value={holdings.length > 0 ? String(holdings.length) : '—'}
+                sub="active holdings"
               />
               <StatCard
-                label="평가손익"
-                value={total ? `₩${fmtKrw(total.pnl_krw)}` : '—'}
-                sub={total ? fmtKrwFull(total.pnl_krw) : undefined}
-                subColor={total ? pnlColor(total.pnl_krw) : undefined}
+                label="실현손익 합계"
+                value={realized.length > 0 ? `₩${fmtKrw(totalRealizedPnl)}` : '—'}
+                sub={realized.length > 0 ? fmtKrwFull(totalRealizedPnl) : undefined}
+                subColor={realized.length > 0 ? pnlColor(totalRealizedPnl) : undefined}
               />
               <StatCard
-                label="수익률"
-                value={total ? fmtPct(total.pnl_pct) : '—'}
-                subColor={total ? pnlColor(total.pnl_pct) : undefined}
+                label="그룹 수"
+                value={summary.length > 0 ? String(summary.length) : '—'}
+                sub="asset groups"
               />
             </div>
 
@@ -209,16 +201,16 @@ export default function AssetPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {summary.map(g => (
-                    <div key={g.group_id} className="juvis-card p-4">
+                    <div key={g.code} className="juvis-card p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <p className="text-[10px] font-mono text-cyan-600 tracking-widest">
-                            [{GROUP_TYPE_LABEL[g.type] ?? g.type.toUpperCase()}]
+                            [{g.code.toUpperCase()}]
                           </p>
-                          <p className="text-sm font-semibold text-cyan-100">{g.name}</p>
+                          <p className="text-sm font-semibold text-cyan-100">{g.name_ko}</p>
                         </div>
-                        <span className={`text-sm font-mono font-bold ${pnlColor(g.pnl_pct)}`}>
-                          {fmtPct(g.pnl_pct)}
+                        <span className="text-sm font-mono font-bold text-cyan-400">
+                          {g.holding_count}종목
                         </span>
                       </div>
                       <div className="space-y-1 text-xs font-mono">
@@ -226,22 +218,16 @@ export default function AssetPage() {
                           <span className="text-cyan-600">평가금액</span>
                           <span className="text-cyan-200">₩{fmtKrw(g.cur_krw)}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-cyan-600">투자금</span>
-                          <span className="text-cyan-400">₩{fmtKrw(g.total_cost_krw)}</span>
-                        </div>
                         <div className="flex justify-between border-t border-cyan-500/10 pt-1 mt-1">
-                          <span className="text-cyan-600">손익</span>
-                          <span className={pnlColor(g.pnl_krw)}>
-                            {g.pnl_krw >= 0 ? '+' : ''}₩{fmtKrw(g.pnl_krw)}
-                          </span>
+                          <span className="text-cyan-600">목표 비중</span>
+                          <span className="text-cyan-400">{g.target_pct}%</span>
                         </div>
                       </div>
-                      {/* PnL bar */}
+                      {/* allocation bar */}
                       <div className="mt-3 h-1 w-full bg-cyan-500/10 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${g.pnl_krw >= 0 ? 'bg-emerald-500/60' : 'bg-red-500/60'}`}
-                          style={{ width: `${Math.min(Math.abs(g.pnl_pct), 100)}%` }}
+                          className="h-full rounded-full transition-all bg-cyan-500/60"
+                          style={{ width: `${Math.min(g.target_pct, 100)}%` }}
                         />
                       </div>
                     </div>
@@ -326,8 +312,7 @@ export default function AssetPage() {
                             <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal hidden md:table-cell">AVG COST</th>
                             <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">CUR PRICE</th>
                             <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">VALUE (KRW)</th>
-                            <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">P&amp;L</th>
-                            <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">%</th>
+                            <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">ROR</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -339,19 +324,16 @@ export default function AssetPage() {
                               <td className="px-4 py-2.5 text-cyan-300 font-bold tracking-wider">{h.ticker}</td>
                               <td className="px-4 py-2.5 text-cyan-400 hidden md:table-cell max-w-[120px] truncate">{h.name}</td>
                               <td className="px-4 py-2.5 text-cyan-600 hidden lg:table-cell">{h.group_name}</td>
-                              <td className="px-4 py-2.5 text-cyan-300 text-right">{h.quantity.toLocaleString()}</td>
+                              <td className="px-4 py-2.5 text-cyan-300 text-right">{h.qty.toLocaleString()}</td>
                               <td className="px-4 py-2.5 text-cyan-400 text-right hidden md:table-cell">
-                                {h.avg_cost.toLocaleString()} {h.currency}
+                                {h.avg_price.toLocaleString()} {h.currency}
                               </td>
                               <td className="px-4 py-2.5 text-cyan-300 text-right">
                                 {h.current_price.toLocaleString()} {h.currency}
                               </td>
-                              <td className="px-4 py-2.5 text-cyan-200 text-right">₩{fmtKrw(h.current_value_krw)}</td>
-                              <td className={`px-4 py-2.5 text-right ${pnlColor(h.pnl_krw)}`}>
-                                {h.pnl_krw >= 0 ? '+' : ''}₩{fmtKrw(h.pnl_krw)}
-                              </td>
-                              <td className={`px-4 py-2.5 text-right ${pnlColor(h.pnl_pct)}`}>
-                                {fmtPct(h.pnl_pct)}
+                              <td className="px-4 py-2.5 text-cyan-200 text-right">₩{fmtKrw(h.eval_krw)}</td>
+                              <td className={`px-4 py-2.5 text-right ${pnlColor(h.ror)}`}>
+                                {fmtPct(h.ror)}
                               </td>
                             </tr>
                           ))}
@@ -371,11 +353,10 @@ export default function AssetPage() {
                       <thead>
                         <tr className="border-b border-cyan-500/15">
                           <th className="text-left px-4 py-3 text-cyan-600 tracking-widest font-normal">DATE</th>
-                          <th className="text-left px-4 py-3 text-cyan-600 tracking-widest font-normal">TICKER</th>
+                          <th className="text-left px-4 py-3 text-cyan-600 tracking-widest font-normal">TYPE</th>
                           <th className="text-left px-4 py-3 text-cyan-600 tracking-widest font-normal hidden md:table-cell">NAME</th>
-                          <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">QTY</th>
-                          <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal hidden md:table-cell">AVG COST</th>
-                          <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal hidden md:table-cell">SELL PRICE</th>
+                          <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal hidden md:table-cell">COST (KRW)</th>
+                          <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal hidden md:table-cell">PROCEEDS (KRW)</th>
                           <th className="text-right px-4 py-3 text-cyan-600 tracking-widest font-normal">PNL (KRW)</th>
                         </tr>
                       </thead>
@@ -383,14 +364,13 @@ export default function AssetPage() {
                         {realized.map((r, i) => (
                           <tr key={r.id ?? i} className="border-b border-cyan-500/8 hover:bg-cyan-500/5 transition-colors">
                             <td className="px-4 py-2.5 text-cyan-600">{r.sell_date}</td>
-                            <td className="px-4 py-2.5 text-cyan-300 font-bold">{r.ticker}</td>
+                            <td className="px-4 py-2.5 text-cyan-300 font-bold">{r.asset_type}</td>
                             <td className="px-4 py-2.5 text-cyan-400 hidden md:table-cell">{r.name ?? '—'}</td>
-                            <td className="px-4 py-2.5 text-cyan-300 text-right">{r.quantity.toLocaleString()}</td>
                             <td className="px-4 py-2.5 text-cyan-400 text-right hidden md:table-cell">
-                              {r.avg_cost.toLocaleString()} {r.currency}
+                              ₩{fmtKrw(r.cost_krw)}
                             </td>
                             <td className="px-4 py-2.5 text-cyan-400 text-right hidden md:table-cell">
-                              {r.sell_price.toLocaleString()} {r.currency}
+                              ₩{fmtKrw(r.proceeds_krw)}
                             </td>
                             <td className={`px-4 py-2.5 text-right font-bold ${pnlColor(r.pnl_krw)}`}>
                               {r.pnl_krw >= 0 ? '+' : ''}₩{fmtKrw(r.pnl_krw)}
