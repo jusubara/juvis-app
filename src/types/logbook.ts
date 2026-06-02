@@ -22,6 +22,12 @@ export interface EastarEntry {
   ld_n: boolean;      // Landing Night
   remarks: string;
   created_at: string;
+  sort_order?: number;
+  date_lcl?: string;   // LCL 날짜 (M/D 형식)
+  ramp_out?: string;   // HH:MM UTC
+  ramp_in?: string;    // HH:MM UTC
+  take_off?: string;   // HH:MM UTC
+  landing?: string;    // HH:MM UTC
 }
 
 // ─── OCR (Claude Vision) Result Types ───────────────────────────────────────
@@ -37,7 +43,12 @@ export interface OcrLeg {
   flt_no: string;
   from: string;
   to: string;
-  block_bt: string;
+  block_ro?: string;   // R/O time HH:MM UTC (Ramp Out)
+  block_ri?: string;   // R/I time HH:MM UTC (Ramp In)
+  block_bt: string;    // B/T block time H+MM
+  block_to?: string;   // T/O time HH:MM UTC (Take Off)
+  block_ld?: string;   // L/D time HH:MM UTC (Landing)
+  block_at?: string;   // A/T time HH:MM UTC (Actual Touchdown)
   night_time: string;
   inst_time: string;
   crew_to_day: string;

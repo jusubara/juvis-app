@@ -36,6 +36,7 @@ export async function loadEntries(): Promise<EastarEntry[]> {
   const { data, error } = await supabase
     .from(TABLE)
     .select('*')
+    .order('sort_order', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -68,6 +69,14 @@ export async function bulkSaveEntries(entries: EastarEntry[]): Promise<EastarEnt
   return loadEntries();
 }
 
+export async function deleteAllEntries(): Promise<void> {
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .not('id', 'is', null);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteEntry(id: string): Promise<EastarEntry[]> {
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw new Error(error.message);
@@ -81,6 +90,7 @@ export interface LogbookStats {
   totalNightMinutes: number;
   totalPicMinutes: number;
   totalCopMinutes: number;
+  totalInstMinutes: number;
   flightCount: number;
   toDay: number;
   toNight: number;
@@ -93,6 +103,7 @@ export function computeStats(entries: EastarEntry[]): LogbookStats {
   let totalNightMinutes = 0;
   let totalPicMinutes = 0;
   let totalCopMinutes = 0;
+  let totalInstMinutes = 0;
   let toDay = 0, toNight = 0, ldDay = 0, ldNight = 0;
 
   for (const e of entries) {
@@ -100,6 +111,7 @@ export function computeStats(entries: EastarEntry[]): LogbookStats {
     totalNightMinutes += parseTime(e.night) ?? 0;
     totalPicMinutes += parseTime(e.pic) ?? 0;
     totalCopMinutes += parseTime(e.cop) ?? 0;
+    totalInstMinutes += parseTime(e.inst) ?? 0;
     if (e.to_d) toDay++;
     if (e.to_n) toNight++;
     if (e.ld_d) ldDay++;
@@ -111,6 +123,7 @@ export function computeStats(entries: EastarEntry[]): LogbookStats {
     totalNightMinutes,
     totalPicMinutes,
     totalCopMinutes,
+    totalInstMinutes,
     flightCount: entries.filter((e) => e.from_apt || e.to_apt).length,
     toDay,
     toNight,

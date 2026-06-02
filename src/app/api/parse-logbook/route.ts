@@ -20,19 +20,30 @@ CREW NAME TABLE (below A/C NO., left side):
 
 MAIN TABLE columns (left to right):
 LEG | FLT NO. | FROM | TO | R/O | R/I | B/T | T/O | L/D | A/T | NIGHT TIME | INST TIME | ...
+- R/O: Ramp Out time (HH:MM UTC, e.g. "06:35")
+- R/I: Ramp In time (HH:MM UTC)
+- B/T: Block Time duration (H+MM)
+- T/O: Take Off time (HH:MM UTC)
+- L/D: Landing time (HH:MM UTC)
+- A/T: Actual Touchdown time (HH:MM UTC)
 
 === CRITICAL FIELD RULES ===
-1. "block_bt" = B/T column value (total block time). Format H+MM (e.g. "2+43"). Do NOT use R/I value.
-2. "night_time" = NIGHT TIME column (after A/T). Often blank.
-3. "inst_time" = INST TIME column. Often blank.
-4. "crew_to_day" = CREW T/O Day — position number (1 or 2) of who did daytime takeoff, or "".
-5. "crew_to_night" = CREW T/O Night — position number or "".
-6. "crew_ld_day" = CREW L/D Day — position number or "".
-7. "crew_ld_night" = CREW L/D Night — position number or "".
-   NOTE: These are crew row numbers (1=first crew, 2=second crew), NOT landing counts.
-8. Time format: convert dots/colons to + sign, drop leading zero on hours.
-   "05.48"→"5+48", "02.43"→"2+43", "08.31"→"8+31"
-9. FUEL data (TTL IN TANK, REMAIN etc.) are large Kg numbers — NEVER put in time fields.
+1. "block_ro" = R/O column (Ramp Out time). Format HH:MM (e.g. "06:35"). Empty string if blank.
+2. "block_ri" = R/I column (Ramp In time). Format HH:MM. Empty string if blank.
+3. "block_bt" = B/T column value (total block time). Format H+MM (e.g. "2+43"). Do NOT use R/I value.
+4. "block_to" = T/O column (Take Off time). Format HH:MM. Empty string if blank.
+5. "block_ld" = L/D column (Landing time). Format HH:MM. Empty string if blank.
+6. "block_at" = A/T column (Actual Touchdown time). Format HH:MM. Empty string if blank.
+7. "night_time" = NIGHT TIME column (after A/T). Often blank.
+8. "inst_time" = INST TIME column. Often blank.
+9. "crew_to_day" = CREW T/O Day — position number (1 or 2) of who did daytime takeoff, or "".
+10. "crew_to_night" = CREW T/O Night — position number or "".
+11. "crew_ld_day" = CREW L/D Day — position number or "".
+12. "crew_ld_night" = CREW L/D Night — position number or "".
+    NOTE: These are crew row numbers (1=first crew, 2=second crew), NOT landing counts.
+13. Block time format (block_bt): convert dots/colons to + sign, drop leading zero on hours.
+    "05.48"→"5+48", "02.43"→"2+43", "08.31"→"8+31"
+14. FUEL data (TTL IN TANK, REMAIN etc.) are large Kg numbers — NEVER put in time fields.
 
 === JSON FORMAT ===
 {
@@ -60,7 +71,12 @@ LEG | FLT NO. | FROM | TO | R/O | R/I | B/T | T/O | L/D | A/T | NIGHT TIME | INS
       "flt_no": "951",
       "from": "PUS",
       "to": "CTS",
+      "block_ro": "06:35",
+      "block_ri": "09:18",
       "block_bt": "2+43",
+      "block_to": "06:50",
+      "block_ld": "09:05",
+      "block_at": "09:08",
       "night_time": "",
       "inst_time": "",
       "crew_to_day": "1",
