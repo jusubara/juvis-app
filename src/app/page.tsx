@@ -12,7 +12,7 @@ const modules = [
     dotColor: "bg-emerald-400",
     dotShadow: "0 0 6px #34d399",
     tag: "FINANCE",
-    href: "/pay-calculator",
+    href: "https://eastarjet-pay.vercel.app",
   },
   {
     id: "logbook",
@@ -167,8 +167,9 @@ export default function Home() {
 }
 
 function ModuleCard({ mod }: { mod: typeof modules[0] }) {
+  const isExternal = mod.href.startsWith("http");
   return (
-    <Link href={mod.href} className="group block">
+    <Link href={mod.href} className="group block" {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
       <div className="juvis-card cursor-pointer">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">

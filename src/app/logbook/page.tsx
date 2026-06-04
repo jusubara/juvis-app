@@ -15,6 +15,7 @@ import {
 } from '@/lib/logbook-storage';
 import { downloadCSVLocally, csvToEntries } from '@/lib/google-drive';
 import GoogleDriveSync, { GoogleDriveSyncHandle } from '@/components/logbook/GoogleDriveSync';
+import CameraScanner from '@/components/logbook/CameraScanner';
 import { INITIAL_ENTRIES } from '@/data/logbook-initial';
 import { AIRPORT_TZ } from '@/lib/pay-calculator/calculator';
 
@@ -205,6 +206,22 @@ export default function LogbookPage() {
   // Leg field inline editing (STEP 3)
   const [editingLeg, setEditingLeg] = useState<{ idx: number; field: keyof OcrLeg } | null>(null);
   const [editingLegValue, setEditingLegValue] = useState('');
+
+  // Camera scanner
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleCameraCapture = useCallback((base64: string, mimeType: string) => {
+    const byteChars = atob(base64);
+    const byteArr = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([byteArr], { type: mimeType });
+    const file = new File([blob], 'camera-scan.jpg', { type: mimeType });
+    setImageFile(file);
+    setCompressedImage({ base64, mime: mimeType });
+    setImageDataUrl(`data:${mimeType};base64,${base64}`);
+    setStatus(1, '카메라 스캔 완료. [AI 인식 실행]을 누르세요.', 'info');
+    setShowScanner(false);
+  }, []);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -847,6 +864,14 @@ export default function LogbookPage() {
   return (
     <main style={{ minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', fontSize: 12, color: '#1a1a1a', background: '#f0f0ea' }}>
 
+      {/* Camera scanner modal (mobile) */}
+      {showScanner && (
+        <CameraScanner
+          onCapture={handleCameraCapture}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+
       {/* ── JUVIS JARVIS Header (dark) ───────────────────────────────────── */}
       <header className="grid-bg relative" style={{ background: '#020c14', borderBottom: '1px solid rgba(0,212,255,0.15)' }}>
         <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
@@ -939,6 +964,16 @@ export default function LogbookPage() {
               >
                 🖼 파일에서 선택
               </button>
+              {/* 모바일 전용: 문서 경계 감지 카메라 스캐너 */}
+              <div className="md:hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  style={{ padding: '8px 16px', fontSize: 13, borderRadius: 6, border: '1.5px solid #15803d', background: '#f0fdf4', color: '#15803d', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+                >
+                  🔍 카메라 스캔
+                </button>
+              </div>
             </div>
           </div>
 

@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react';
-import type { MonthResult, ProcessedFlight } from '@/lib/pay-calculator/calculator';
-import { DOMESTIC_AIRPORTS, RATES } from '@/lib/pay-calculator/calculator';
+import type { MonthResult, ProcessedFlight } from '@/lib/calculator';
+import { DOMESTIC_AIRPORTS, RATES } from '@/lib/calculator';
 
 interface Props {
   result: MonthResult;
@@ -17,6 +17,9 @@ const fh  = (m: number) => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, 
 // 달러: 소수점 없이 정수
 const fd  = (n: number) => `$${Math.ceil(n)}`;
 
+// const TRIP_LABEL: Record<string, string> = {
+//   quickturn: '퀵턴', night_quickturn: '야간퀵턴', layover: '레이오버',
+// };
 const TRIP_COLOR: Record<string, string> = {
   quickturn:       'bg-blue-100 text-blue-700 border-blue-200',
   night_quickturn: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -143,7 +146,7 @@ export default function ResultView({ result: r, position, tripOverrides, onTripO
                   <tbody>
                     <tr className="border-t border-gray-100">
                       {row1.map(({ label, value }) => (
-                        <td key={label} className="px-2 py-2.5 text-right font-mono font-medium text-gray-900 border-r border-gray-100 last:border-0">
+                        <td key={label} className="px-2 py-2.5 text-right font-mono font-medium border-r border-gray-100 last:border-0">
                           {value > 0 ? Math.ceil(value).toLocaleString() : <span className="text-gray-300">—</span>}
                         </td>
                       ))}
@@ -157,7 +160,7 @@ export default function ResultView({ result: r, position, tripOverrides, onTripO
                     </tr>
                     <tr className="border-t border-gray-100">
                       {extra.map(({ label, value }) => (
-                        <td key={label} className="px-2 py-2.5 text-right font-mono font-medium text-gray-900 border-r border-gray-100 last:border-0">
+                        <td key={label} className="px-2 py-2.5 text-right font-mono font-medium border-r border-gray-100 last:border-0">
                           {Math.ceil(value).toLocaleString()}
                         </td>
                       ))}
@@ -179,7 +182,7 @@ export default function ResultView({ result: r, position, tripOverrides, onTripO
                 ['체재비_국내', r.domLandPay > 0 ? fw(r.domLandPay) : '—']].map(([l, v]) => (
                 <div key={l} className="px-3 py-2">
                   <div className="text-xs text-gray-400">{l}</div>
-                  <div className="font-mono text-xs font-medium text-gray-900 mt-0.5">{v}</div>
+                  <div className="font-mono text-xs font-medium mt-0.5">{v}</div>
                 </div>
               ))}
             </div>
@@ -203,7 +206,7 @@ export default function ResultView({ result: r, position, tripOverrides, onTripO
         {r.localTransPay > 0 && (
           <div className="border-t border-gray-100 px-3 py-2">
             <div className="text-xs text-gray-400">지방차량이동비</div>
-            <div className="font-mono text-xs font-medium text-gray-900 mt-0.5">{fw(r.localTransPay)}</div>
+            <div className="font-mono text-xs font-medium mt-0.5">{fw(r.localTransPay)}</div>
           </div>
         )}
       </div>
