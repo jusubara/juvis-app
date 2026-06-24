@@ -964,8 +964,8 @@ export default function LogbookPage() {
               >
                 🖼 파일에서 선택
               </button>
-              {/* 모바일 전용: 문서 경계 감지 카메라 스캐너 */}
-              <div className="md:hidden">
+              {/* 문서 경계 감지 카메라 스캐너 */}
+              <div>
                 <button
                   type="button"
                   onClick={() => setShowScanner(true)}
