@@ -17,7 +17,7 @@ interface Captured {
   corners: Quad;
 }
 
-const STABLE_MS = 500;
+const STABLE_MS = 1500;
 const ARC_R = 44;
 const CIRC = 2 * Math.PI * ARC_R;
 
@@ -29,7 +29,7 @@ function detectDoc(data: Uint8ClampedArray, w: number, h: number): Quad | null {
   for (let y = MARGIN; y < h - MARGIN; y += STEP) {
     for (let x = MARGIN; x < w - MARGIN; x += STEP) {
       const i = (Math.floor(y) * w + Math.floor(x)) * 4;
-      if (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] > 170) {
+      if (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] > 190) {
         if (x < minX) minX = x; if (x > maxX) maxX = x;
         if (y < minY) minY = y; if (y > maxY) maxY = y;
         count++;
@@ -39,9 +39,10 @@ function detectDoc(data: Uint8ClampedArray, w: number, h: number): Quad | null {
 
   if (count < 100) return null;
   const rw = maxX - minX, rh = maxY - minY;
-  if (rw < w * 0.2 || rh < h * 0.2 || rw > w * 0.97 || rh > h * 0.97) return null;
+  const areaPct = (rw * rh) / (w * h);
+  if (areaPct < 0.25 || areaPct > 0.85) return null;
   const asp = rw / rh;
-  if (asp < 0.4 || asp > 2.5) return null;
+  if (asp < 0.5 || asp > 2.0) return null;
   return [
     { x: minX, y: minY }, { x: maxX, y: minY },
     { x: maxX, y: maxY }, { x: minX, y: maxY },
@@ -84,6 +85,8 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
   const lastDetectRef = useRef(0);
   const captureCallbackRef = useRef<() => void>(() => {});
   const adjustContainerRef = useRef<HTMLDivElement>(null);
+  const prevQuadRef = useRef<Quad | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [phase, setPhase] = useState<'scanning' | 'adjusting'>('scanning');
   const [ready, setReady] = useState(false);
@@ -146,15 +149,30 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
       setHasDoc(!!q);
 
       if (q) {
-        if (!stableStartRef.current) stableStartRef.current = now;
-        const elapsed = now - stableStartRef.current;
-        setCountPct(Math.min(1, elapsed / STABLE_MS));
-        if (elapsed >= STABLE_MS && !autoFiredRef.current) {
-          autoFiredRef.current = true;
-          captureCallbackRef.current();
-          return;
+        const prev = prevQuadRef.current;
+        const posStable = prev
+          ? q.every((pt, i) =>
+              Math.abs(pt.x - prev[i].x) < vw * 0.1 &&
+              Math.abs(pt.y - prev[i].y) < vh * 0.1
+            )
+          : false;
+        prevQuadRef.current = q;
+
+        if (posStable) {
+          if (!stableStartRef.current) stableStartRef.current = now;
+          const elapsed = now - stableStartRef.current;
+          setCountPct(Math.min(1, elapsed / STABLE_MS));
+          if (elapsed >= STABLE_MS && !autoFiredRef.current) {
+            autoFiredRef.current = true;
+            captureCallbackRef.current();
+            return;
+          }
+        } else {
+          stableStartRef.current = 0;
+          setCountPct(0);
         }
       } else {
+        prevQuadRef.current = null;
         stableStartRef.current = 0;
         setCountPct(0);
       }
@@ -169,6 +187,7 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
     let cancelled = false;
     stableStartRef.current = 0;
     autoFiredRef.current = false;
+    prevQuadRef.current = null;
     setReady(false);
     setError(null);
     setHasDoc(false);
@@ -321,6 +340,31 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
 
   const close = useCallback(() => { stopCamera(); onClose(); }, [stopCamera, onClose]);
 
+  const openGallery = useCallback(() => { galleryInputRef.current?.click(); }, []);
+
+  const onGalleryFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const corners: Quad = [
+          { x: 0, y: 0 }, { x: iw, y: 0 },
+          { x: iw, y: ih }, { x: 0, y: ih },
+        ];
+        stopCamera();
+        setCaptured({ imageDataUrl: dataUrl, imageWidth: iw, imageHeight: ih, corners });
+        setPhase('adjusting');
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }, [stopCamera]);
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', flexDirection: 'column' }}>
 
@@ -417,7 +461,21 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
                 }} />
               </div>
 
-              <div style={{ minWidth: 48 }} />
+              <button onClick={openGallery} style={{
+                color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none',
+                fontSize: 14, cursor: 'pointer', minWidth: 48, padding: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              }}>
+                <span style={{ fontSize: 22 }}>🖼</span>
+                <span style={{ fontSize: 11 }}>갤러리</span>
+              </button>
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={onGalleryFile}
+              />
             </div>
           )}
         </>
