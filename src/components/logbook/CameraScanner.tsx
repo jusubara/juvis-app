@@ -17,9 +17,6 @@ interface Captured {
   corners: Quad;
 }
 
-const STABLE_MS = 1500;
-const ARC_R = 44;
-const CIRC = 2 * Math.PI * ARC_R;
 
 function detectDoc(data: Uint8ClampedArray, w: number, h: number): Quad | null {
   const STEP = 4;
@@ -80,19 +77,14 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number>(0);
   const detectedRef = useRef<Quad | null>(null);
-  const stableStartRef = useRef(0);
-  const autoFiredRef = useRef(false);
   const lastDetectRef = useRef(0);
-  const captureCallbackRef = useRef<() => void>(() => {});
   const adjustContainerRef = useRef<HTMLDivElement>(null);
-  const prevQuadRef = useRef<Quad | null>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [phase, setPhase] = useState<'scanning' | 'adjusting'>('scanning');
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasDoc, setHasDoc] = useState(false);
-  const [countPct, setCountPct] = useState(0);
   const [captured, setCaptured] = useState<Captured | null>(null);
   const [dispCorners, setDispCorners] = useState<Quad | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -118,8 +110,6 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
     setCaptured({ imageDataUrl, imageWidth: iw, imageHeight: ih, corners });
     setPhase('adjusting');
   }, [stopCamera]);
-
-  useEffect(() => { captureCallbackRef.current = doCapture; }, [doCapture]);
 
   const renderFrame = useCallback(() => {
     const video = videoRef.current;
@@ -147,35 +137,6 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
       detectedRef.current = q;
       drawScanOverlay(overlay.getContext('2d')!, vw, vh, q);
       setHasDoc(!!q);
-
-      if (q) {
-        const prev = prevQuadRef.current;
-        const posStable = prev
-          ? q.every((pt, i) =>
-              Math.abs(pt.x - prev[i].x) < vw * 0.1 &&
-              Math.abs(pt.y - prev[i].y) < vh * 0.1
-            )
-          : false;
-        prevQuadRef.current = q;
-
-        if (posStable) {
-          if (!stableStartRef.current) stableStartRef.current = now;
-          const elapsed = now - stableStartRef.current;
-          setCountPct(Math.min(1, elapsed / STABLE_MS));
-          if (elapsed >= STABLE_MS && !autoFiredRef.current) {
-            autoFiredRef.current = true;
-            captureCallbackRef.current();
-            return;
-          }
-        } else {
-          stableStartRef.current = 0;
-          setCountPct(0);
-        }
-      } else {
-        prevQuadRef.current = null;
-        stableStartRef.current = 0;
-        setCountPct(0);
-      }
     }
     rafRef.current = requestAnimationFrame(renderFrame);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -185,13 +146,9 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
   useEffect(() => {
     if (phase !== 'scanning') return;
     let cancelled = false;
-    stableStartRef.current = 0;
-    autoFiredRef.current = false;
-    prevQuadRef.current = null;
     setReady(false);
     setError(null);
     setHasDoc(false);
-    setCountPct(0);
 
     (async () => {
       try {
@@ -405,7 +362,7 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
                   fontSize: 13, fontWeight: hasDoc ? 600 : 400,
                   transition: 'background 0.3s',
                 }}>
-                  {hasDoc ? '문서 감지됨 - 잠시 기다려주세요...' : '문서를 화면 안에 맞춰주세요'}
+                  {hasDoc ? '문서 감지됨 - 버튼을 눌러 촬영하세요' : '문서를 화면 안에 맞춰주세요'}
                 </div>
               </div>
             )}
@@ -438,28 +395,15 @@ export default function CameraScanner({ onCapture, onClose }: Props) {
                 fontSize: 14, cursor: 'pointer', minWidth: 48, padding: 0,
               }}>취소</button>
 
-              {/* Shutter with countdown arc */}
-              <div style={{ position: 'relative', width: 80, height: 80 }}>
-                {hasDoc && (
-                  <svg width={96} height={96} style={{ position: 'absolute', top: -8, left: -8 }}>
-                    <circle cx={48} cy={48} r={ARC_R} fill="none" stroke="rgba(0,122,255,0.25)" strokeWidth={4} />
-                    <circle cx={48} cy={48} r={ARC_R} fill="none"
-                      stroke="#007AFF" strokeWidth={4} strokeLinecap="round"
-                      strokeDasharray={CIRC}
-                      strokeDashoffset={CIRC * (1 - countPct)}
-                      transform="rotate(-90 48 48)"
-                    />
-                  </svg>
-                )}
-                <button onClick={doCapture} disabled={!ready} style={{
-                  width: 80, height: 80, borderRadius: '50%',
-                  background: hasDoc ? '#fff' : 'rgba(255,255,255,0.45)',
-                  border: `5px solid ${hasDoc ? '#007AFF' : 'rgba(255,255,255,0.35)'}`,
-                  cursor: ready ? 'pointer' : 'default',
-                  boxShadow: hasDoc ? '0 0 20px rgba(0,122,255,0.5)' : 'none',
-                  transition: 'all 0.25s', padding: 0,
-                }} />
-              </div>
+              {/* Shutter button */}
+              <button onClick={doCapture} disabled={!ready} style={{
+                width: 80, height: 80, borderRadius: '50%',
+                background: hasDoc ? '#fff' : 'rgba(255,255,255,0.45)',
+                border: `5px solid ${hasDoc ? '#007AFF' : 'rgba(255,255,255,0.35)'}`,
+                cursor: ready ? 'pointer' : 'default',
+                boxShadow: hasDoc ? '0 0 20px rgba(0,122,255,0.5)' : 'none',
+                transition: 'all 0.25s', padding: 0,
+              }} />
 
               <button onClick={openGallery} style={{
                 color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none',
