@@ -18,7 +18,7 @@ const modules = [
     id: "logbook",
     icon: "📒",
     title: "전자 로그북",
-    titleEn: "Electronic Logbook",
+    titleEn: "Electronic Logbook (OCR)",
     description: "운항기록부 사진을 업로드하면 Claude Vision이 자동 파싱 후 Supabase에 저장합니다.",
     status: "ONLINE",
     statusColor: "text-emerald-400",
@@ -26,6 +26,19 @@ const modules = [
     dotShadow: "0 0 6px #34d399",
     tag: "FLIGHT",
     href: "/logbook",
+  },
+  {
+    id: "logbook2",
+    icon: "✈️",
+    title: "로그북 v2",
+    titleEn: "Pilot Logbook — Manual Entry",
+    description: "날짜·기체·노선·시간·역할을 직접 입력하는 파일럿 비행 기록부. 숫자패드 방식 시간 입력, 경로 자동완성 지원.",
+    status: "ONLINE",
+    statusColor: "text-emerald-400",
+    dotColor: "bg-emerald-400",
+    dotShadow: "0 0 6px #34d399",
+    tag: "FLIGHT",
+    href: "/logbook2",
   },
   {
     id: "portfolio",
@@ -134,18 +147,11 @@ export default function Home() {
             </span>
           </div>
 
-          {/* 2-2-1 grid layout */}
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {modules.slice(0, 4).map((mod) => (
-                <ModuleCard key={mod.id} mod={mod} />
-              ))}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {modules.slice(4).map((mod) => (
-                <ModuleCard key={mod.id} mod={mod} />
-              ))}
-            </div>
+          {/* 2-column grid layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {modules.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} />
+            ))}
           </div>
         </section>
 
