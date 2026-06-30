@@ -24,6 +24,7 @@ interface Props {
   onDelete: (id: string) => void;
   onReorder?: (newEntries: Logbook2Entry[]) => void;
   onUpdate: (id: string, changes: Partial<Logbook2Entry>) => void;
+  onEdit: (entry: Logbook2Entry) => void;
 }
 
 function thStyle(extra: React.CSSProperties = {}): React.CSSProperties {
@@ -60,13 +61,14 @@ function crewStr(crew: Logbook2Entry['crew']): string {
 }
 
 function SortableRow({
-  entry, i, onDelete,
+  entry, i, onDelete, onEdit,
   editingField, editingValue,
   onCellClick, onBoolToggle, onEditChange, onEditKeyDown,
 }: {
   entry: Logbook2Entry;
   i: number;
   onDelete: (id: string) => void;
+  onEdit: () => void;
   editingField: string | null;
   editingValue: string;
   onCellClick: (field: string, value: string) => void;
@@ -153,12 +155,22 @@ function SortableRow({
       {boolCell('ld_d', entry.ld_d)}
       {boolCell('ld_n', entry.ld_n)}
       {textCell('remark', entry.remark, remarkDisplay, { textAlign: 'left', paddingLeft: 3, fontSize: 10 })}
-      <td style={tdStyle()}>
+      <td style={tdStyle({ padding: '2px 1px' })}>
+        <button
+          onClick={() => { if (window.confirm('이 기록을 수정하시겠습니까?')) onEdit(); }}
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ccc', padding: '2px 3px', fontSize: 12 }}
+          onMouseEnter={ev => (ev.currentTarget.style.color = '#1a56db')}
+          onMouseLeave={ev => (ev.currentTarget.style.color = '#ccc')}
+          title="수정"
+        >
+          ✏
+        </button>
         <button
           onClick={() => { if (window.confirm('이 기록을 삭제하시겠습니까?')) onDelete(entry.id); }}
-          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ccc', padding: '2px 4px', fontSize: 15 }}
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#ccc', padding: '2px 3px', fontSize: 15 }}
           onMouseEnter={ev => (ev.currentTarget.style.color = '#e53e3e')}
           onMouseLeave={ev => (ev.currentTarget.style.color = '#ccc')}
+          title="삭제"
         >
           ×
         </button>
@@ -167,7 +179,7 @@ function SortableRow({
   );
 }
 
-export default function LogbookTable({ entries, stats, onDelete, onReorder, onUpdate }: Props) {
+export default function LogbookTable({ entries, stats, onDelete, onReorder, onUpdate, onEdit }: Props) {
   const [editing, setEditing] = useState<EditState | null>(null);
 
   const sensors = useSensors(
@@ -268,7 +280,7 @@ export default function LogbookTable({ entries, stats, onDelete, onReorder, onUp
             <col style={{ width: 22 }} />  {/* LD D */}
             <col style={{ width: 22 }} />  {/* LD N */}
             <col style={{ width: 130 }} /> {/* REMARK */}
-            <col style={{ width: 26 }} />  {/* DEL */}
+            <col style={{ width: 48 }} />  {/* EDIT/DEL */}
           </colgroup>
           <thead>
             <tr>
@@ -314,6 +326,7 @@ export default function LogbookTable({ entries, stats, onDelete, onReorder, onUp
                   entry={e}
                   i={i}
                   onDelete={handleDelete}
+                  onEdit={() => onEdit(e)}
                   editingField={editing?.id === e.id ? editing.field : null}
                   editingValue={editing?.id === e.id ? editing.value : ''}
                   onCellClick={(field, value) => handleCellClick(e, field, value)}

@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Logbook2Entry, CrewMember, CrewDb,
-  loadCrewDb, saveEntry, lookupRoute, saveRoute, upsertCrewMember,
+  loadCrewDb, saveEntry, updateEntry, lookupRoute, saveRoute, upsertCrewMember,
   halfTime,
 } from '@/lib/logbook2-storage';
 
@@ -306,35 +306,63 @@ function PicusDialog({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
 
 // ─── EntryForm ────────────────────────────────────────────────────────────────
 
-export default function EntryForm({ lastCrew }: { lastCrew?: CrewMember[] }) {
+function parseAppType(str: string): { type: string; suffix: string; rwy: string } {
+  if (!str) return { type: '', suffix: '', rwy: '' };
+  const rwyMatch = str.match(/RWY(\S+)/);
+  const rwy = rwyMatch ? rwyMatch[1] : '';
+  const withoutRwy = str.replace(/\s*RWY\S+/, '').trim();
+  const parts = withoutRwy.split(' ');
+  return { type: parts[0] || '', suffix: parts[1] || '', rwy };
+}
+
+export default function EntryForm({
+  lastCrew, initialData, onSave, onCancel,
+}: {
+  lastCrew?: CrewMember[];
+  initialData?: Logbook2Entry;
+  onSave?: (entry: Logbook2Entry) => void;
+  onCancel?: () => void;
+}) {
   const router = useRouter();
 
-  const [date, setDate] = useState(today());
-  const [acIdent, setAcIdent] = useState('');
-  const [acType, setAcType] = useState('');
-  const [fltNo, setFltNo] = useState('201');
-  const [fromApt, setFromApt] = useState('');
-  const [toApt, setToApt] = useState('');
-  const [block, setBlock] = useState('');
-  const [night, setNight] = useState('');
-  const [inst, setInst] = useState('');
+  const _parsed = initialData ? parseAppType(initialData.app_type) : { type: '', suffix: '', rwy: '' };
 
-  const [pilotingTypes, setPilotingTypes] = useState<Set<string>>(new Set());
-  const [pic, setPic] = useState('');
-  const [picus, setPicus] = useState('');
-  const [cop, setCop] = useState('');
-  const [ip, setIp] = useState('');
-  const [tr, setTr] = useState('');
+  const [date, setDate] = useState(initialData?.date ?? today());
+  const [acIdent, setAcIdent] = useState(initialData?.ac_ident ?? '');
+  const [acType, setAcType] = useState(initialData?.ac_type ?? '');
+  const [fltNo, setFltNo] = useState(initialData?.flt_no ?? '201');
+  const [fromApt, setFromApt] = useState(initialData?.from_apt ?? '');
+  const [toApt, setToApt] = useState(initialData?.to_apt ?? '');
+  const [block, setBlock] = useState(initialData?.block ?? '');
+  const [night, setNight] = useState(initialData?.night ?? '');
+  const [inst, setInst] = useState(initialData?.inst ?? '');
+
+  const [pilotingTypes, setPilotingTypes] = useState<Set<string>>(() => {
+    if (!initialData) return new Set();
+    const s = new Set<string>();
+    if (initialData.pic) s.add('PIC');
+    if (initialData.picus) s.add('PICUS');
+    if (initialData.cop) s.add('COP');
+    if (initialData.ip) s.add('IP');
+    if (initialData.tr) s.add('TR');
+    return s;
+  });
+  const [pic, setPic] = useState(initialData?.pic ?? '');
+  const [picus, setPicus] = useState(initialData?.picus ?? '');
+  const [cop, setCop] = useState(initialData?.cop ?? '');
+  const [ip, setIp] = useState(initialData?.ip ?? '');
+  const [tr, setTr] = useState(initialData?.tr ?? '');
   const [picusDialogOpen, setPicusDialogOpen] = useState(false);
 
-  const [appType, setAppType] = useState('');
-  const [appSuffix, setAppSuffix] = useState('');
-  const [appRwy, setAppRwy] = useState('');
-  const [toDay, setToDay] = useState(false);
-  const [toNight, setToNight] = useState(false);
-  const [ldDay, setLdDay] = useState(false);
-  const [ldNight, setLdNight] = useState(false);
+  const [appType, setAppType] = useState(_parsed.type);
+  const [appSuffix, setAppSuffix] = useState(_parsed.suffix);
+  const [appRwy, setAppRwy] = useState(_parsed.rwy);
+  const [toDay, setToDay] = useState(initialData?.to_d ?? false);
+  const [toNight, setToNight] = useState(initialData?.to_n ?? false);
+  const [ldDay, setLdDay] = useState(initialData?.ld_d ?? false);
+  const [ldNight, setLdNight] = useState(initialData?.ld_n ?? false);
   const [crew, setCrew] = useState<CrewMember[]>(
+    initialData?.crew?.length ? initialData.crew :
     lastCrew?.length ? lastCrew.map(c => ({ name: c.name, duty: '' })) : [{ name: '', duty: '' }]
   );
   const [crewDb, setCrewDb] = useState<CrewDb[]>([]);
@@ -344,10 +372,12 @@ export default function EntryForm({ lastCrew }: { lastCrew?: CrewMember[] }) {
 
   useEffect(() => {
     loadCrewDb().then(setCrewDb).catch(() => {});
-    lookupRoute('201').then(route => {
-      if (route) { setFromApt(route.from_apt); setToApt(route.to_apt); }
-    }).catch(() => {});
-  }, []);
+    if (!initialData) {
+      lookupRoute('201').then(route => {
+        if (route) { setFromApt(route.from_apt); setToApt(route.to_apt); }
+      }).catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (acIdent && AC_TYPE_MAP[acIdent]) setAcType(AC_TYPE_MAP[acIdent]);
@@ -437,7 +467,7 @@ export default function EntryForm({ lastCrew }: { lastCrew?: CrewMember[] }) {
       for (const c of crew) {
         if (c.name && c.duty) await upsertCrewMember(c.name, c.duty);
       }
-      const entry: Omit<Logbook2Entry, 'id' | 'created_at'> = {
+      const entryData: Omit<Logbook2Entry, 'id' | 'created_at'> = {
         date, ac_ident: acIdent, ac_type: acType, flt_no: fltNo,
         from_apt: fromApt, to_apt: toApt, block, night, inst,
         pic, picus, cop, ip, tr,
@@ -445,8 +475,13 @@ export default function EntryForm({ lastCrew }: { lastCrew?: CrewMember[] }) {
         to_d: toDay, to_n: toNight, ld_d: ldDay, ld_n: ldNight,
         crew: crew.filter(c => c.name), remark: remarks,
       };
-      await saveEntry(entry);
-      router.push('/logbook2');
+      if (initialData) {
+        const updated = await updateEntry(initialData.id, entryData);
+        if (onSave) onSave(updated); else router.push('/logbook2');
+      } else {
+        const saved = await saveEntry(entryData);
+        if (onSave) onSave(saved); else router.push('/logbook2');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장 실패');
     } finally {
@@ -810,11 +845,11 @@ export default function EntryForm({ lastCrew }: { lastCrew?: CrewMember[] }) {
             cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
-          {saving ? '저장 중…' : '저장'}
+          {saving ? (initialData ? '수정 중…' : '저장 중…') : (initialData ? '수정 완료' : '저장')}
         </button>
         <button
           type="button"
-          onClick={() => router.push('/logbook2')}
+          onClick={() => onCancel ? onCancel() : router.push('/logbook2')}
           style={{
             padding: '14px 24px', fontSize: 15, fontWeight: 600,
             border: '2px solid #ddd', borderRadius: 10,

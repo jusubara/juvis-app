@@ -139,9 +139,32 @@ export async function updateSortOrders(updates: { id: string; sort_order: number
 export async function saveEntry(
   entry: Omit<Logbook2Entry, 'id' | 'created_at'>
 ): Promise<Logbook2Entry> {
+  // Auto-calculate sort_order: same date max+1, else global max+1
+  let sort_order: number;
+
+  const { data: sameDateRows } = await sb
+    .from('logbook_v2')
+    .select('sort_order')
+    .eq('date', entry.date)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  if (sameDateRows && sameDateRows.length > 0 && sameDateRows[0].sort_order != null) {
+    sort_order = sameDateRows[0].sort_order + 1;
+  } else {
+    const { data: globalRows } = await sb
+      .from('logbook_v2')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1);
+    sort_order = (globalRows && globalRows.length > 0 && globalRows[0].sort_order != null)
+      ? globalRows[0].sort_order + 1
+      : 1;
+  }
+
   const { data, error } = await sb
     .from('logbook_v2')
-    .insert(entry)
+    .insert({ ...entry, sort_order })
     .select()
     .single();
   if (error) throw new Error(error.message);

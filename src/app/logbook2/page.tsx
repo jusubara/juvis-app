@@ -7,6 +7,7 @@ import {
   Logbook2Entry, Logbook2Stats,
 } from '@/lib/logbook2-storage';
 import LogbookTable from '@/components/logbook2/LogbookTable';
+import EntryForm from '@/components/logbook2/EntryForm';
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -31,6 +32,8 @@ export default function Logbook2Page() {
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [sortDesc, setSortDesc] = useState(true); // true = 최신순(DESC), false = 시간순(ASC)
+  const [editingEntry, setEditingEntry] = useState<Logbook2Entry | null>(null);
 
   useEffect(() => {
     loadEntries()
@@ -66,8 +69,12 @@ export default function Logbook2Page() {
     let r = entries;
     if (selectedYear !== null) r = r.filter(e => getYear(e) === selectedYear);
     if (selectedMonth !== null) r = r.filter(e => getMonth(e) === selectedMonth);
-    return r;
-  }, [entries, selectedYear, selectedMonth]);
+    return [...r].sort((a, b) => {
+      const ao = a.sort_order ?? 0;
+      const bo = b.sort_order ?? 0;
+      return sortDesc ? bo - ao : ao - bo;
+    });
+  }, [entries, selectedYear, selectedMonth, sortDesc]);
 
   const filteredStats: Logbook2Stats = useMemo(() => computeStats(filteredEntries), [filteredEntries]);
   const totalStats: Logbook2Stats = useMemo(() => computeStats(entries), [entries]);
@@ -90,14 +97,34 @@ export default function Logbook2Page() {
     }
   }
 
+  function handleEdit(entry: Logbook2Entry) {
+    setEditingEntry(entry);
+  }
+
+  function handleFormSave(saved: Logbook2Entry) {
+    setEntries(prev =>
+      editingEntry
+        ? prev.map(e => e.id === saved.id ? saved : e)
+        : [...prev, saved]
+    );
+    setEditingEntry(null);
+  }
+
   async function handleReorder(newFiltered: Logbook2Entry[]) {
-    const filteredIds = new Set(newFiltered.map(e => e.id));
-    setEntries(prev => {
-      let fi = 0;
-      return prev.map(entry => filteredIds.has(entry.id) ? newFiltered[fi++] : entry);
-    });
+    const n = newFiltered.length;
+    // sortDesc: 상단(i=0)이 가장 큰 sort_order여야 DESC 정렬 시 제자리
+    // sortAsc:  상단(i=0)이 가장 작은 sort_order여야 ASC 정렬 시 제자리
+    const withNewOrders = newFiltered.map((e, i) => ({
+      ...e,
+      sort_order: sortDesc ? n - i : i + 1,
+    }));
+    const orderMap = new Map(withNewOrders.map(e => [e.id, e.sort_order!]));
+
+    setEntries(prev => prev.map(e =>
+      orderMap.has(e.id) ? { ...e, sort_order: orderMap.get(e.id)! } : e
+    ));
     try {
-      await updateSortOrders(newFiltered.map((e, i) => ({ id: e.id, sort_order: i + 1 })));
+      await updateSortOrders(withNewOrders.map(e => ({ id: e.id, sort_order: e.sort_order! })));
     } catch {
       // silent
     }
@@ -243,6 +270,16 @@ export default function Logbook2Page() {
         >
           CSV 다운로드
         </button>
+        <button
+          onClick={() => setSortDesc(d => !d)}
+          style={{
+            padding: '9px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+            border: '1.5px solid #6366f1', background: sortDesc ? '#eef2ff' : '#f5f3ff',
+            color: '#4f46e5', cursor: 'pointer',
+          }}
+        >
+          {sortDesc ? '최신순 ↓' : '시간순 ↑'}
+        </button>
         <span style={{ fontSize: 11, color: '#888' }}>
           {filteredEntries.length}개 기록
           {(selectedYear !== null || selectedMonth !== null)
@@ -258,7 +295,36 @@ export default function Logbook2Page() {
         onDelete={handleDelete}
         onReorder={handleReorder}
         onUpdate={handleUpdate}
+        onEdit={handleEdit}
       />
+
+      {/* Edit modal */}
+      {editingEntry && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          zIndex: 1000, overflowY: 'auto',
+        }}>
+          <div style={{ maxWidth: 640, margin: '20px auto', padding: '0 12px 40px' }}>
+            <div style={{ background: '#f0f0ea', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '10px 16px', background: '#1a56db', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>기록 수정</span>
+                <button
+                  onClick={() => setEditingEntry(null)}
+                  style={{ border: 'none', background: 'transparent', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}
+                >
+                  ×
+                </button>
+              </div>
+              <EntryForm
+                key={editingEntry.id}
+                initialData={editingEntry}
+                onSave={handleFormSave}
+                onCancel={() => setEditingEntry(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
     </main>
   );
