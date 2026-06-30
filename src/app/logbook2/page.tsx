@@ -280,6 +280,31 @@ export default function Logbook2Page() {
         >
           {sortDesc ? '최신순 ↓' : '시간순 ↑'}
         </button>
+        <button
+          onClick={() => window.open('/logbook2/print?mode=normal', '_blank')}
+          style={{
+            padding: '9px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+            border: '1.5px solid #92400e', background: '#fffbeb', color: '#92400e',
+            cursor: 'pointer',
+          }}
+        >
+          일반 출력
+        </button>
+        <button
+          onClick={() => {
+            const y = selectedYear ?? '';
+            const m = selectedMonth ?? '';
+            const qs = y ? `&year=${y}${m ? `&month=${m}` : ''}` : '';
+            window.open(`/logbook2/print?mode=monthly${qs}`, '_blank');
+          }}
+          style={{
+            padding: '9px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+            border: '1.5px solid #92400e', background: '#fef3c7', color: '#78350f',
+            cursor: 'pointer',
+          }}
+        >
+          월별 출력{selectedYear ? ` (${selectedYear}${selectedMonth ? `/${selectedMonth}` : ''})` : ''}
+        </button>
         <span style={{ fontSize: 11, color: '#888' }}>
           {filteredEntries.length}개 기록
           {(selectedYear !== null || selectedMonth !== null)
