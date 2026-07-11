@@ -55,36 +55,42 @@ function pageYear(entries: Logbook2Entry[]): number {
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 
 const PRINT_CSS = `
-  @page { size: 254mm 187mm; }
-  @page :right { margin: 15mm 7mm 13mm 20mm; }
-  @page :left  { margin: 15mm 20mm 13mm 7mm; }
+  @page { size: 250mm 176mm landscape; margin: 0; }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; }
   @media screen {
     body { background: #ccc; padding: 16px; }
-    .lb-page { background: #fff; margin: 0 auto 20px; width: 214mm;
+    .lb-page { background: #fff; margin: 0 auto 20px; width: 230mm;
                padding: 3mm; box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
   }
   @media print {
     body { background: none; padding: 0; }
     .lb-page { width: 100%; margin: 0; padding: 0; }
     .no-print { display: none !important; }
+    .lb-logo { display: flex !important; }
   }
   table { border-collapse: collapse; width: 100%; table-layout: fixed; }
   th, td {
-    border: 0.4pt solid #555; font-size: 7pt; padding: 0 1pt;
+    border: 1px solid #555; font-size: 6.5pt; padding: 0 1pt;
     text-align: center; vertical-align: middle; line-height: 1.2;
     color: #000;
   }
   .th-g  { background: #d4d4d4; font-weight: 700; }
   .th-s  { background: #e8e8e8; font-weight: 600; }
-  .dr    { height: 7.2mm; }
+  .dr    { height: 8mm; }
   .dr-even { background: #fff; }
   .dr-odd  { background: #f8f8f8; }
   .fr { background: #dde4f0; }
-  .fl { text-align: left; font-weight: 700; font-size: 6.5pt; padding-left: 2pt; }
-  .fb { font-size: 8pt; font-weight: 700; display: block; }
-  .sig { text-align: left; vertical-align: top; padding: 3pt 4pt; font-size: 6.5pt; }
+  .fl { text-align: left; font-weight: 700; font-size: 6pt; padding-left: 2pt; }
+  .fb { font-size: 7pt; font-weight: 700; display: block; }
+  .sig {
+    text-align: left; vertical-align: top; padding: 3pt 4pt; font-size: 6pt;
+    overflow: hidden; height: 18mm; max-height: 18mm;
+  }
+  .fr-row { height: 6mm; max-height: 6mm; overflow: hidden; }
+  tfoot { display: table-footer-group; height: 18mm; max-height: 18mm; }
+  .dr td { font-size: 8pt; line-height: 1.4; }
+  .td-remark { text-align: left; font-size: 6.5pt; white-space: normal; word-break: break-all; overflow: hidden; vertical-align: middle; padding: 1pt; }
 `;
 
 // ─── Table header ─────────────────────────────────────────────────────────────
@@ -95,15 +101,15 @@ function THead({ year }: { year: number }) {
       {/* Row 1: group labels */}
       <tr>
         <th rowSpan={3} className="th-s">
-          <span style={{display:'block',fontSize:'6pt',fontWeight:600,lineHeight:1.3}}>YEAR</span>
-          <span style={{display:'block',fontSize:'10pt',fontWeight:700,lineHeight:1.1}}>{year}</span>
-          <span style={{display:'block',fontSize:'6pt',lineHeight:1.3}}>DATE<br/>(M/D)</span>
+          <span style={{display:'block',fontSize:'5.5pt',fontWeight:600,lineHeight:1.3}}>YEAR</span>
+          <span style={{display:'block',fontSize:'9pt',fontWeight:700,lineHeight:1.1}}>{year}</span>
+          <span style={{display:'block',fontSize:'5.5pt',lineHeight:1.3}}>DATE<br/>(M/D)</span>
         </th>
         <th colSpan={2} className="th-g">AIRCRAFT</th>
         <th colSpan={3} className="th-g">ROUTE OF FLIGHT</th>
         <th colSpan={5} className="th-g">TYPE OF PILOTING TIME</th>
         <th colSpan={8} className="th-g">CONDITIONS OF FLIGHT</th>
-        <th rowSpan={3} className="th-s" style={{textAlign:'left',paddingLeft:'2pt',fontSize:'6.5pt'}}>REMARK</th>
+        <th rowSpan={3} className="th-s" style={{textAlign:'left',paddingLeft:'2pt',fontSize:'6pt',whiteSpace:'normal'}}>REMARK</th>
       </tr>
       {/* Row 2: column labels */}
       <tr>
@@ -144,7 +150,7 @@ function DataRow({ entry, idx }: { entry: Logbook2Entry | null; idx: number }) {
     <tr className={cls}>
       <td>{fmtDate(entry.date)}</td>
       <td>{entry.ac_type}</td>
-      <td style={{fontSize:'6.5pt'}}>{entry.ac_ident}</td>
+      <td>{entry.ac_ident}</td>
       <td>{entry.flt_no}</td>
       <td>{entry.from_apt}</td>
       <td>{entry.to_apt}</td>
@@ -156,12 +162,12 @@ function DataRow({ entry, idx }: { entry: Logbook2Entry | null; idx: number }) {
       <td style={{fontWeight:700}}>{entry.block}</td>
       <td>{entry.night}</td>
       <td>{entry.inst}</td>
-      <td style={{textAlign:'left',fontSize:'6pt'}}>{entry.app_type}</td>
+      <td style={{textAlign:'left'}}>{entry.app_type}</td>
       <td>{entry.to_d?'✓':''}</td>
       <td>{entry.to_n?'✓':''}</td>
       <td>{entry.ld_d?'✓':''}</td>
       <td>{entry.ld_n?'✓':''}</td>
-      <td style={{textAlign:'left',fontSize:'6pt'}}>{remark}</td>
+      <td className="td-remark">{remark}</td>
     </tr>
   );
 }
@@ -187,11 +193,12 @@ function FooterRows({ pageSt, fwdSt, totalSt }: { pageSt: PS; fwdSt: PS; totalSt
   return (
     <>
       {/* PAGE TOTALS */}
-      <tr>
+      <tr className="fr-row">
         <td colSpan={3} rowSpan={3} className="sig">
-          PILOT&apos;S SIGNATURE _______________________________
-          <br/><br/>
-          <span style={{fontSize:'6pt',color:'#000'}}>THIS RECORD IS CERTIFIED TRUE AND CORRECT</span>
+          <div style={{display:'flex',flexDirection:'column',justifyContent:'space-between',height:'14mm'}}>
+            <span>PILOT&apos;S SIGNATURE</span>
+            <span style={{fontSize:'5.5pt'}}>THIS RECORD IS CERTIFIED TRUE AND CORRECT</span>
+          </div>
         </td>
         <td colSpan={3} className="fr fl">PAGE TOTALS</td>
         {timeKeys.map(k => <FV key={k} v={T(pageSt[k])}/>)}
@@ -200,7 +207,7 @@ function FooterRows({ pageSt, fwdSt, totalSt }: { pageSt: PS; fwdSt: PS; totalSt
         <td className="fr"/>
       </tr>
       {/* AMT. FORWARDED */}
-      <tr>
+      <tr className="fr-row">
         <td colSpan={3} className="fr fl">AMT. FORWARDED</td>
         {timeKeys.map(k => <FV key={k} v={T(fwdSt[k])}/>)}
         <td className="fr"/>
@@ -208,7 +215,7 @@ function FooterRows({ pageSt, fwdSt, totalSt }: { pageSt: PS; fwdSt: PS; totalSt
         <td className="fr"/>
       </tr>
       {/* TOTALS TO DATE */}
-      <tr>
+      <tr className="fr-row">
         <td colSpan={3} className="fr fl">TOTALS TO DATE</td>
         {timeKeys.map(k => <FV key={k} v={T(totalSt[k])}/>)}
         <td className="fr"/>
@@ -229,36 +236,46 @@ interface PageBlockProps {
   fwdSt: PS;
   totalSt: PS;
   year: number;
+  pageIndex: number;
 }
 
-function PageBlock({ entries, maxRows, showFooter, pageSt, fwdSt, totalSt, year }: PageBlockProps) {
+function PageBlock({ entries, maxRows, showFooter, pageSt, fwdSt, totalSt, year, pageIndex }: PageBlockProps) {
   const rows = [...entries];
   while (rows.length < maxRows) rows.push(null as unknown as Logbook2Entry);
+  // 홀수 페이지(1,3,5... → pageIndex 0,2,4): 좌15/우5 / 짝수 페이지: 좌5/우15
+  const logoAlign  = pageIndex % 2 === 0 ? 'flex-end' : 'flex-start';
+  const padLeft    = pageIndex % 2 === 0 ? '15mm' : '5mm';
+  const padRight   = pageIndex % 2 === 0 ? '5mm'  : '15mm';
+  const pageStyle  = { paddingTop:'10mm', paddingBottom:'8mm', paddingLeft:padLeft, paddingRight:padRight } as const;
 
   return (
-    <div className="lb-page">
+    <div className="lb-page" style={pageStyle}>
+      <div className="lb-logo" style={{display:'flex', justifyContent:logoAlign, marginBottom:'2mm'}}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/eastar-logo.png" alt="Eastar Jet" style={{height:'24px'}}/>
+      </div>
       <table>
         <colgroup>
-          <col style={{width:'8mm'}}/>   {/* DATE */}
+          <col style={{width:'9mm'}}/>   {/* DATE */}
           <col style={{width:'9mm'}}/>   {/* A/C TYPE */}
           <col style={{width:'11mm'}}/>  {/* A/C IDENT */}
           <col style={{width:'8mm'}}/>   {/* FLT NO */}
           <col style={{width:'7mm'}}/>   {/* FROM */}
           <col style={{width:'7mm'}}/>   {/* TO */}
-          <col style={{width:'9mm'}}/>   {/* PIC */}
-          <col style={{width:'9mm'}}/>   {/* PICUS */}
-          <col style={{width:'9mm'}}/>   {/* CO-PILOT */}
-          <col style={{width:'6mm'}}/>   {/* IP */}
-          <col style={{width:'6mm'}}/>   {/* TR */}
-          <col style={{width:'9mm'}}/>   {/* BLOCK */}
+          <col style={{width:'8mm'}}/>   {/* PIC */}
+          <col style={{width:'8mm'}}/>   {/* PICUS */}
+          <col style={{width:'8mm'}}/>   {/* CO-PILOT */}
+          <col style={{width:'7mm'}}/>   {/* IP */}
+          <col style={{width:'7mm'}}/>   {/* TR */}
+          <col style={{width:'8mm'}}/>   {/* BLOCK */}
           <col style={{width:'8mm'}}/>   {/* NIGHT */}
           <col style={{width:'8mm'}}/>   {/* INST */}
-          <col style={{width:'12mm'}}/>  {/* APP TYPE */}
+          <col style={{width:'20mm'}}/>  {/* APP TYPE */}
           <col style={{width:'5mm'}}/>   {/* TO-D */}
           <col style={{width:'5mm'}}/>   {/* TO-N */}
           <col style={{width:'5mm'}}/>   {/* LD-D */}
           <col style={{width:'5mm'}}/>   {/* LD-N */}
-          <col style={{width:'22mm'}}/>  {/* REMARK */}
+          <col style={{width:'26mm'}}/>  {/* REMARK — proportional base: 179mm → rendered 230mm */}
         </colgroup>
         <THead year={year}/>
         <tbody>
@@ -274,13 +291,13 @@ function PageBlock({ entries, maxRows, showFooter, pageSt, fwdSt, totalSt, year 
   );
 }
 
-// ─── Normal print (15 rows/page, always with footer) ─────────────────────────
+// ─── Normal print (12 rows/page, always with footer) ─────────────────────────
 // pageSt  = this page's entries sum
 // fwdSt   = previous page's TOTALS TO DATE (0 for first page)
 // totalSt = fwdSt + pageSt
 
 function NormalPrint({ entries }: { entries: Logbook2Entry[] }) {
-  const ROWS = 15;
+  const ROWS = 12;
   const chunks: Logbook2Entry[][] = [];
   for (let i = 0; i < Math.max(entries.length, 1); i += ROWS) {
     chunks.push(entries.slice(i, i + ROWS));
@@ -301,7 +318,7 @@ function NormalPrint({ entries }: { entries: Logbook2Entry[] }) {
     <>
       {pages.map(({ ch, pageSt, fwdSt, totalSt, year, isLast }, pi) => (
         <div key={pi} style={{pageBreakAfter:isLast?'auto':'always', breakAfter:isLast?'auto':'page'}}>
-          <PageBlock entries={ch} maxRows={ROWS} showFooter pageSt={pageSt} fwdSt={fwdSt} totalSt={totalSt} year={year}/>
+          <PageBlock entries={ch} maxRows={ROWS} showFooter pageSt={pageSt} fwdSt={fwdSt} totalSt={totalSt} year={year} pageIndex={pi}/>
         </div>
       ))}
     </>
@@ -359,25 +376,23 @@ function MonthlyPrint({ entries, filterYear, filterMonth }: {
     const totalSt = addPS(fwdSt, pageSt); // TOTALS TO DATE = fwdSt + month total
     globalCum = totalSt;
 
-    // Split: non-last pages are always 18 rows full; last page ≤ 15 rows (+ footer).
-    // k = ceil((N-15)/18) → number of full 18-row non-last pages.
-    // Edge: if lastCount = N - 18k ≤ 0 (N ≡ 0,16,17 mod 18), reduce k by 1.
+    // Split: middle pages fill exactly their entry count (no blank rows).
+    // Last page always pads up to ROWS_LAST with blank rows.
+    // If remaining > ROWS_LAST after greedy 14-row pages, make it another middle page.
+    const ROWS_LAST = 12;
+    const ROWS_MID  = 14;
     const chunks: { entries: Logbook2Entry[]; isLast: boolean }[] = [];
-    if (N <= 15) {
-      chunks.push({ entries: me, isLast: true });
-    } else {
-      const k = Math.ceil((N - 15) / 18);
-      const lastCount = N - 18 * k;
-      const fullPages = lastCount > 0 ? k : k - 1;
-      for (let i = 0; i < fullPages; i++) {
-        chunks.push({ entries: me.slice(i * 18, (i + 1) * 18), isLast: false });
-      }
-      chunks.push({ entries: me.slice(fullPages * 18), isLast: true });
+    let pos = 0;
+    while (N - pos > ROWS_LAST) {
+      const take = Math.min(ROWS_MID, N - pos);
+      chunks.push({ entries: me.slice(pos, pos + take), isLast: false });
+      pos += take;
     }
+    chunks.push({ entries: me.slice(pos), isLast: true });
 
     for (const { entries: ch, isLast } of chunks) {
-      // last page: maxRows = max(15, actual) to handle rare edge cases (N=16~18)
-      const maxRows = isLast ? Math.max(15, ch.length) : 18;
+      // middle pages: no padding; last page: pad to ROWS_LAST
+      const maxRows = isLast ? ROWS_LAST : ch.length;
       allPages.push({
         key, entries: ch,
         maxRows,
@@ -396,7 +411,7 @@ function MonthlyPrint({ entries, filterYear, filterMonth }: {
         <div key={pi} style={{pageBreakAfter:p.isLast?'auto':'always', breakAfter:p.isLast?'auto':'page'}}>
           <PageBlock
             entries={p.entries} maxRows={p.maxRows} showFooter={p.showFooter}
-            pageSt={p.pageSt} fwdSt={p.fwdSt} totalSt={p.totalSt} year={p.year}
+            pageSt={p.pageSt} fwdSt={p.fwdSt} totalSt={p.totalSt} year={p.year} pageIndex={pi}
           />
         </div>
       ))}
