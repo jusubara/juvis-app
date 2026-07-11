@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Alert,
-  StyleSheet, SafeAreaView, ScrollView, ActivityIndicator,
+  StyleSheet, ScrollView, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { refreshFltRouteDbFromSupabase, insertDummyData } from '../lib/database';
 
 const RED = '#DC1E28';

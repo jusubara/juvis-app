@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView,
+  StyleSheet, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const RED  = '#DC1E28';
 const DARK = '#1a2332';

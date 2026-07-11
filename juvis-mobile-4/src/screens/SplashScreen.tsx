@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, Image, StyleSheet, Animated, Easing,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const RED   = '#C41E3A';
@@ -10,6 +11,7 @@ const DARK  = '#1a2332';
 const MUTED = '#6b7a8d';
 
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
+  const insets     = useSafeAreaInsets();
   const progress   = useRef(new Animated.Value(0)).current;
   const [pct, setPct] = useState(0);
 
@@ -46,7 +48,7 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { paddingTop: 80 + insets.top, paddingBottom: 52 + insets.bottom }]}>
 
       {/* ─── 상단: 로그북 이미지 + 로고 + 브랜드 텍스트 ─── */}
       <View style={s.topSection}>
@@ -99,8 +101,6 @@ const s = StyleSheet.create({
     backgroundColor: BG,
     paddingHorizontal: 32,
     justifyContent: 'space-between',
-    paddingTop: 80,
-    paddingBottom: 52,
   },
 
   // 상단

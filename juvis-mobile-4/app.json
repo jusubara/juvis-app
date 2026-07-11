@@ -24,7 +24,8 @@
         "foregroundImage": "./assets/pilot-logbook.png",
         "backgroundColor": "#f0f4f8"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.jusubara.juvismobile4"
     },
     "web": {
       "favicon": "./assets/favicon.png"

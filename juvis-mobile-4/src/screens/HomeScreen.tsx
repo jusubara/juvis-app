@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Modal,
-  SafeAreaView, ActivityIndicator, Alert, ScrollView, PanResponder,
+  ActivityIndicator, Alert, ScrollView, PanResponder,
   LayoutAnimation, UIManager, Platform, Image, Animated,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 // Enable LayoutAnimation on Android for smooth drag reordering
@@ -556,6 +557,7 @@ function EntryRow({
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ onNavigate, onEdit, refreshTrigger }: Props) {
+  const insets = useSafeAreaInsets();
   const [allEntries, setAllEntries] = useState<LogbookEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -1078,7 +1080,7 @@ export default function HomeScreen({ onNavigate, onEdit, refreshTrigger }: Props
         }}
       >
         <TouchableOpacity style={s.pdfOverlay} activeOpacity={1} onPress={() => setShowPdfModal(false)}>
-          <View style={s.pdfSheet} onStartShouldSetResponder={() => true}>
+          <View style={[s.pdfSheet, { paddingBottom: 32 + insets.bottom }]} onStartShouldSetResponder={() => true}>
             <View style={s.pdfSheetHandle} />
             <Text style={s.pdfSheetTitle}>PDF 저장 범위 선택</Text>
             <ScrollView style={s.pdfSheetScroll} showsVerticalScrollIndicator={false} bounces={false}>
@@ -1254,7 +1256,7 @@ const s = StyleSheet.create({
   pdfSheet: {
     backgroundColor: BG,
     borderTopLeftRadius: 18, borderTopRightRadius: 18,
-    paddingTop: 10, paddingBottom: 32,
+    paddingTop: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12, shadowRadius: 12, elevation: 10,
   },
