@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { runMigrationSeedFltRouteDbIfNeeded } from './src/lib/database';
+import UpdatePopup     from './src/components/UpdatePopup';
 import SplashScreen_   from './src/screens/SplashScreen';
 import MainMenuScreen  from './src/screens/MainMenuScreen';
 import HomeScreen      from './src/screens/HomeScreen';
@@ -100,6 +102,7 @@ function AppContent() {
   return (
     <>
       <StatusBar style="dark" />
+      <UpdatePopup />
 
       {screen === 'splash' && (
         <SplashScreen_ onDone={() => setScreen('mainMenu')} />
@@ -124,8 +127,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "juvis-mobile-4",
+    "name": "juvismobile4",
     "slug": "juvis-mobile-4",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon-1024.png",
     "userInterfaceStyle": "light",
@@ -14,9 +14,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.jusubara.juvismobile4",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "파일럿 로그북"
+        "CFBundleDisplayName": "모바일 파일럿 로그북"
       }
     },
     "android": {
@@ -24,7 +25,10 @@
         "foregroundImage": "./assets/pilot-logbook.png",
         "backgroundColor": "#f0f4f8"
       },
-      "edgeToEdgeEnabled": true
+      "versionCode": 2,
+      "edgeToEdgeEnabled": true,
+      "package": "com.jusubara.juvismobile4",
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

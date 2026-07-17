@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View, Text, Image, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView,
+  StyleSheet, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const RED   = '#C41E3A';
@@ -85,7 +86,7 @@ export default function MainMenuScreen({ onNavigate }: { onNavigate: (s: Target)
       <View style={s.header}>
         <View style={s.headerLeft}>
           <Ionicons name="airplane" size={20} color={RED} />
-          <Text style={s.headerTitle}>EASTARJET MOBILE PILOT'S LOGBOOK</Text>
+          <Text style={s.headerTitle}>MOBILE PILOT'S LOGBOOK</Text>
         </View>
         <View style={s.profileIcon}>
           <Ionicons name="person" size={18} color={MUTED} />
@@ -103,11 +104,6 @@ export default function MainMenuScreen({ onNavigate }: { onNavigate: (s: Target)
           <Image
             source={require('../../assets/pilot-logbook.png')}
             style={s.logbookImg}
-            resizeMode="contain"
-          />
-          <Image
-            source={require('../../assets/eastar-logo.png')}
-            style={s.logo}
             resizeMode="contain"
           />
           <Text style={s.heroTitle}>PILOT DASHBOARD</Text>
@@ -173,7 +169,6 @@ const s = StyleSheet.create({
     gap: 10,
   },
   logbookImg: { width: 280, height: 200, marginBottom: 4 },
-  logo: { width: 180, height: 54 },
   heroTitle: {
     fontSize: 22,
     fontWeight: '800',

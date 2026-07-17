@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, SafeAreaView,
+  ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { File as EXFile } from 'expo-file-system';
 import * as iconv from 'iconv-lite';
@@ -58,9 +59,6 @@ function AppHeader({ onBack }: { onBack: () => void }) {
       <TouchableOpacity onPress={onBack} style={{ paddingVertical: 4, paddingRight: 4 }}>
         <Text style={{ color: RED, fontSize: 15, fontWeight: '600' }}>← 뒤로</Text>
       </TouchableOpacity>
-      <View style={s.logoBox}>
-        <Text style={s.logoText}>EASTAR JET</Text>
-      </View>
       <Text style={s.headerTitle}>파일 불러오기</Text>
     </View>
   );
@@ -382,8 +380,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10,
     backgroundColor: BG, borderBottomWidth: 2, borderBottomColor: RED, gap: 10,
   },
-  logoBox: { backgroundColor: RED, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 4 },
-  logoText: { fontSize: 11, fontWeight: '800', color: BG, letterSpacing: 1 },
   headerTitle: { fontSize: 16, fontWeight: '700', color: TEXT },
 
   // Card

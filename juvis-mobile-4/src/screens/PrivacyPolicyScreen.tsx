@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView,
+  StyleSheet, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const RED   = '#DC1E28';
 const DARK  = '#1a2332';
@@ -54,7 +55,7 @@ export default function PrivacyPolicyScreen({ onBack }: { onBack: () => void }) 
 
         <View style={s.intro}>
           <Text style={s.introText}>
-            이스타항공 모바일 파일럿 로그북(이하 "본 앱")은 사용자의 개인정보 보호를 중요하게 생각합니다.
+            모바일 파일럿 로그북(이하 "본 앱")은 사용자의 개인정보 보호를 중요하게 생각합니다.
           </Text>
         </View>
 

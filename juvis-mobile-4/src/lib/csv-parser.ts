@@ -193,6 +193,11 @@ export function csvToEntries(csvText: string): ParseResult {
         entry['crew'] = '';
       }
 
+      // Skip summary/invalid rows (DATE = "SUM", empty, or any non-date value)
+      if (!/^\d{4}-\d{2}-\d{2}/.test(entry['date'] as string)) {
+        return;
+      }
+
       entries.push(entry as unknown as LogbookEntry);
     } catch (e) {
       errors.push(`Line ${index + 2}: ${String(e)}`);

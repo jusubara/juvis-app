@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, SafeAreaView, Modal,
+  ScrollView, Alert, Modal,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import {
   insertEntry, updateEntry, generateId,
   parseTimeToMinutes, minutesToTimeStr, halfTime,
-  lookupRoute, saveRoute, getNextSortOrder,
+  lookupRoute, saveRoute, getNextSortOrder, getDistinctIdents,
   LogbookEntry,
 } from '../lib/database';
 
@@ -454,10 +455,24 @@ export default function NewEntryScreen({ onBack, onSaved, initialData }: Props) 
   });
 
   // ── Pickers ──
-  const [identPickerOpen, setIdentPickerOpen] = useState(false);
   const [appTypePickerOpen, setAppTypePickerOpen] = useState(false);
   const [appSuffixPickerOpen, setAppSuffixPickerOpen] = useState(false);
   const [dutyPickerIdx, setDutyPickerIdx] = useState<number | null>(null);
+
+  // ── A/C IDENT 자동완성 ──
+  const [pastIdents, setPastIdents] = useState<string[]>([]);
+  const [identSugg, setIdentSugg] = useState<string[]>([]);
+
+  useEffect(() => {
+    getDistinctIdents().then(setPastIdents).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const q = acIdent.toUpperCase().trim();
+    if (q.length < 2) { setIdentSugg([]); return; }
+    const pool = [...new Set([...AC_LIST, ...pastIdents])];
+    setIdentSugg(pool.filter(id => id.startsWith(q) && id !== q).slice(0, 6));
+  }, [acIdent, pastIdents]);
 
   // Auto-fill AC type from ident
   useEffect(() => {
@@ -578,9 +593,6 @@ export default function NewEntryScreen({ onBack, onSaved, initialData }: Props) 
         <TouchableOpacity onPress={onBack} style={{ paddingVertical: 4 }}>
           <Text style={{ color: TEXT_DIM, fontSize: 14 }}>← 취소</Text>
         </TouchableOpacity>
-        <View style={f.logoBox}>
-          <Text style={f.logoText}>EASTAR JET</Text>
-        </View>
         <Text style={f.headerTitle}>{isEdit ? '기록 수정' : '새 기록'}</Text>
         <View style={{ flex: 1 }} />
         <TouchableOpacity
@@ -638,12 +650,36 @@ export default function NewEntryScreen({ onBack, onSaved, initialData }: Props) 
           <Section title="2. A/C IDENT  /  3. A/C TYPE">
             <View style={f.row}>
               <View style={{ flex: 2 }}>
-                <PickBtn
-                  label="A/C IDENT"
-                  value={acIdent}
-                  placeholder="기체 선택"
-                  onPress={() => setIdentPickerOpen(true)}
-                />
+                <Text style={f.label}>A/C IDENT</Text>
+                <View style={f.identRow}>
+                  <Text style={f.identPrefix}>HL</Text>
+                  <TextInput
+                    value={acIdent.startsWith('HL') ? acIdent.slice(2) : acIdent}
+                    onChangeText={(v) => {
+                      const digits = v.replace(/[^0-9]/g, '');
+                      setAcIdent(digits.length > 0 ? 'HL' + digits : '');
+                    }}
+                    placeholder="8500"
+                    placeholderTextColor="#BBB"
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    style={[f.input, f.identInput]}
+                  />
+                </View>
+                {identSugg.length > 0 && (
+                  <View style={f.suggBox}>
+                    {identSugg.map(s => (
+                      <TouchableOpacity
+                        key={s}
+                        style={f.suggItem}
+                        onPress={() => { setAcIdent(s); if (AC_TYPE_MAP[s]) setAcType(AC_TYPE_MAP[s]); setIdentSugg([]); }}
+                      >
+                        <Text style={f.suggText}>{s.startsWith('HL') ? s.slice(2) : s}</Text>
+                        {AC_TYPE_MAP[s] ? <Text style={f.suggSub}>{AC_TYPE_MAP[s]}</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={f.label}>A/C TYPE</Text>
@@ -879,14 +915,6 @@ export default function NewEntryScreen({ onBack, onSaved, initialData }: Props) 
 
       {/* Pickers */}
       <SheetPicker
-        visible={identPickerOpen}
-        title="기체 선택"
-        options={['', ...AC_LIST]}
-        value={acIdent}
-        onSelect={(v) => { setAcIdent(v); if (v && AC_TYPE_MAP[v]) setAcType(AC_TYPE_MAP[v]); }}
-        onClose={() => setIdentPickerOpen(false)}
-      />
-      <SheetPicker
         visible={appTypePickerOpen}
         title="APP TYPE 선택"
         options={APP_TYPE_OPTIONS}
@@ -925,8 +953,6 @@ const f = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10,
     backgroundColor: BG, borderBottomWidth: 2, borderBottomColor: RED, gap: 10,
   },
-  logoBox: { backgroundColor: RED, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 4 },
-  logoText: { fontSize: 11, fontWeight: '800', color: BG, letterSpacing: 1 },
   headerTitle: { fontSize: 16, fontWeight: '700', color: TEXT },
   saveBtn: { backgroundColor: RED, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 8 },
   saveBtnText: { color: BG, fontWeight: '700', fontSize: 14 },
@@ -948,11 +974,19 @@ const f = StyleSheet.create({
     backgroundColor: CARD_BG, borderWidth: 1, borderColor: BORDER,
     borderRadius: 8, color: TEXT, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14,
   },
+  identRow: { flexDirection: 'row', alignItems: 'center' },
+  identPrefix: {
+    fontSize: 14, fontWeight: '700', color: TEXT_DIM,
+    backgroundColor: '#ECECEC', paddingHorizontal: 10, paddingVertical: 10,
+    borderWidth: 1, borderColor: BORDER, borderRightWidth: 0,
+    borderTopLeftRadius: 8, borderBottomLeftRadius: 8,
+  },
+  identInput: { flex: 1, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   label: { fontSize: 10, color: TEXT_DIM, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
   row: { flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
   timeRow: { flexDirection: 'row', gap: 10 },
 
-  // Picker button
+  // Picker button (used by appType/suffix/duty pickers)
   pickerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: CARD_BG, borderWidth: 1, borderColor: BORDER,
@@ -961,6 +995,20 @@ const f = StyleSheet.create({
   pickerBtnText: { color: TEXT, fontSize: 14, flex: 1 },
   pickerBtnPlaceholder: { color: '#BBB', fontSize: 14, flex: 1 },
   pickerArrow: { color: TEXT_DIM, fontSize: 12 },
+
+  // A/C IDENT 자동완성
+  suggBox: {
+    borderWidth: 1, borderColor: BORDER, borderRadius: 8,
+    overflow: 'hidden', marginTop: 2, backgroundColor: BG,
+    elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4,
+  },
+  suggItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER,
+  },
+  suggText: { fontSize: 14, color: TEXT, fontWeight: '600' },
+  suggSub: { fontSize: 11, color: TEXT_DIM },
 
   // Piloting
   pilotingBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

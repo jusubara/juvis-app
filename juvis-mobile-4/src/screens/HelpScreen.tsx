@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, SafeAreaView, ScrollView,
+  StyleSheet, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const RED  = '#DC1E28';
 const DARK = '#1a2332';
@@ -34,7 +35,7 @@ export default function HelpScreen({ onBack }: { onBack: () => void }) {
             <View style={s.listRow}>
               <Text style={s.listNum}>1.</Text>
               <Text style={s.listText}>
-                회사 CMS에서 다운로드한 CSV 파일을 불러오면 비행기록이 자동으로 입력됩니다.
+                CMS에서 다운로드한 CSV 파일을 불러오면 비행기록이 자동으로 입력됩니다.
               </Text>
             </View>
             <View style={s.listRow}>

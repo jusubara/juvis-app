@@ -76,28 +76,43 @@ const CREATE_MIGRATIONS_SQL = `
   );
 `;
 
-let dbInstance: SQLite.SQLiteDatabase | null = null;
+const CREATE_APP_SETTINGS_SQL = `
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`;
 
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (!dbInstance) {
-    dbInstance = await SQLite.openDatabaseAsync('logbook.db');
-    await dbInstance.execAsync(CREATE_TABLE_SQL);
-    await dbInstance.execAsync(CREATE_FLT_ROUTE_SQL);
-    await dbInstance.execAsync(CREATE_MIGRATIONS_SQL);
-    // Migration: add crew column for existing DBs
-    try {
-      await dbInstance.execAsync(`ALTER TABLE logbook ADD COLUMN crew TEXT DEFAULT ''`);
-    } catch {
-      // Column already exists — ignore
-    }
-    // Migration: add sort_order column for existing DBs
-    try {
-      await dbInstance.execAsync(`ALTER TABLE logbook ADD COLUMN sort_order INTEGER`);
-    } catch {
-      // Column already exists — ignore
-    }
+// Promise-based singleton: 동시 다발적 getDatabase() 호출이 와도
+// openDatabaseAsync는 단 한 번만 실행됨 (Android GC 레이스 컨디션 방지)
+let _dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+async function _initDatabase(): Promise<SQLite.SQLiteDatabase> {
+  const db = await SQLite.openDatabaseAsync('logbook.db');
+  await db.execAsync(CREATE_TABLE_SQL);
+  await db.execAsync(CREATE_FLT_ROUTE_SQL);
+  await db.execAsync(CREATE_MIGRATIONS_SQL);
+  await db.execAsync(CREATE_APP_SETTINGS_SQL);
+  // Migration: add crew column for existing DBs
+  try {
+    await db.execAsync(`ALTER TABLE logbook ADD COLUMN crew TEXT DEFAULT ''`);
+  } catch {
+    // Column already exists — ignore
   }
-  return dbInstance;
+  // Migration: add sort_order column for existing DBs
+  try {
+    await db.execAsync(`ALTER TABLE logbook ADD COLUMN sort_order INTEGER`);
+  } catch {
+    // Column already exists — ignore
+  }
+  return db;
+}
+
+export function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (!_dbPromise) {
+    _dbPromise = _initDatabase();
+  }
+  return _dbPromise;
 }
 
 // ─── One-time migration: reverse sort_order within each date group ─────────────
@@ -256,12 +271,17 @@ export async function insertEntry(entry: LogbookEntry): Promise<void> {
        sort_order, created_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      entry.id, entry.date, entry.ac_type, entry.ac_ident, entry.flt_no,
-      entry.from_apt, entry.to_apt, entry.pic, entry.picus, entry.cop,
-      entry.ip, entry.tr, entry.block, entry.night, entry.inst,
-      entry.app_type, entry.to_d, entry.to_n, entry.ld_d, entry.ld_n,
-      entry.remark, entry.crew ?? '', entry.ramp_out, entry.ramp_in,
-      entry.sort_order, entry.created_at,
+      entry.id   ?? null, entry.date ?? null,
+      entry.ac_type  ?? null, entry.ac_ident ?? null, entry.flt_no   ?? null,
+      entry.from_apt ?? null, entry.to_apt   ?? null,
+      entry.pic   ?? null, entry.picus ?? null, entry.cop ?? null,
+      entry.ip    ?? null, entry.tr    ?? null,
+      entry.block ?? null, entry.night ?? null, entry.inst ?? null,
+      entry.app_type ?? null,
+      entry.to_d  ?? 0, entry.to_n ?? 0, entry.ld_d ?? 0, entry.ld_n ?? 0,
+      entry.remark   ?? null, entry.crew     ?? null,
+      entry.ramp_out ?? null, entry.ramp_in  ?? null,
+      entry.sort_order ?? null, entry.created_at ?? null,
     ]
   );
 }
@@ -278,12 +298,17 @@ export async function insertEntries(entries: LogbookEntry[]): Promise<void> {
            sort_order, created_at)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          entry.id, entry.date, entry.ac_type, entry.ac_ident, entry.flt_no,
-          entry.from_apt, entry.to_apt, entry.pic, entry.picus, entry.cop,
-          entry.ip, entry.tr, entry.block, entry.night, entry.inst,
-          entry.app_type, entry.to_d, entry.to_n, entry.ld_d, entry.ld_n,
-          entry.remark, entry.crew ?? '', entry.ramp_out, entry.ramp_in,
-          entry.sort_order, entry.created_at,
+          entry.id   ?? null, entry.date ?? null,
+          entry.ac_type  ?? null, entry.ac_ident ?? null, entry.flt_no   ?? null,
+          entry.from_apt ?? null, entry.to_apt   ?? null,
+          entry.pic   ?? null, entry.picus ?? null, entry.cop ?? null,
+          entry.ip    ?? null, entry.tr    ?? null,
+          entry.block ?? null, entry.night ?? null, entry.inst ?? null,
+          entry.app_type ?? null,
+          entry.to_d  ?? 0, entry.to_n ?? 0, entry.ld_d ?? 0, entry.ld_n ?? 0,
+          entry.remark   ?? null, entry.crew     ?? null,
+          entry.ramp_out ?? null, entry.ramp_in  ?? null,
+          entry.sort_order ?? null, entry.created_at ?? null,
         ]
       );
     }
@@ -414,41 +439,6 @@ export async function runMigrationSeedFltRouteDbIfNeeded(): Promise<void> {
   console.log(`[Migration] seed_flt_route_db_v1 done — ${rows.length} rows in ${Date.now() - t0}ms`);
 }
 
-// ─── Online refresh: pull latest flt_route_db from Supabase ──────────────────
-// Call this from a "노선 DB 업데이트" button (requires network).
-
-const SUPABASE_URL = 'https://nzbecoyxkuxaxxyjjfkp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56YmVjb3l4a3V4YXh4eWpqZmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5Nzc5MjksImV4cCI6MjA4OTU1MzkyOX0.Gj0pIFDzooAac1eBr2gBA6mNUiHvtF_8KlH_9X0Dr64';
-
-export async function refreshFltRouteDbFromSupabase(): Promise<number> {
-  const url = `${SUPABASE_URL}/rest/v1/flt_route_db?select=flt_no,from_apt,to_apt,count&order=count.desc&limit=2000`;
-  const res = await fetch(url, {
-    headers: {
-      apikey:        SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      Accept:        'application/json',
-    },
-  });
-  if (!res.ok) throw new Error(`Supabase ${res.status}`);
-
-  const rows: { flt_no: string; from_apt: string; to_apt: string; count: number }[] = await res.json();
-  const db = await getDatabase();
-
-  await db.withTransactionAsync(async () => {
-    for (const row of rows) {
-      if (!row.flt_no) continue;
-      await db.runAsync(
-        `INSERT INTO flt_route_db (flt_no, from_apt, to_apt, count) VALUES (?, ?, ?, ?)
-         ON CONFLICT(flt_no) DO UPDATE SET from_apt=excluded.from_apt, to_apt=excluded.to_apt, count=excluded.count`,
-        [row.flt_no.toUpperCase(), row.from_apt ?? '', row.to_apt ?? '', row.count ?? 1]
-      );
-    }
-  });
-
-  console.log(`[refreshFltRouteDb] updated ${rows.length} rows from Supabase`);
-  return rows.length;
-}
-
 export async function updateSortOrders(
   items: { id: string; sort_order: number }[]
 ): Promise<void> {
@@ -468,82 +458,19 @@ export async function deleteAllEntries(): Promise<void> {
   await db.runAsync('DELETE FROM logbook');
 }
 
-// ─── DEV ONLY: 스크린샷용 더미 데이터 삽입 ───────────────────────────────────
-export async function insertDummyData(): Promise<void> {
-  const nextSo = await getNextSortOrder();
+// ─── App Settings (버전 추적 등) ──────────────────────────────────────────────
 
-  const DUMMY: Omit<LogbookEntry, 'id' | 'sort_order' | 'created_at'>[] = [
-    {
-      date: '2026-07-01', ac_type: 'B738', ac_ident: 'HL8500',
-      flt_no: '101', from_apt: 'ICN', to_apt: 'CJU',
-      pic: '1+05', picus: '', cop: '', ip: '', tr: '',
-      block: '1+05', night: '', inst: '',
-      app_type: '', to_d: 1, to_n: 0, ld_d: 1, ld_n: 0,
-      remark: '', crew: JSON.stringify([{ name: '김민준', duty: 'F' }]),
-      ramp_out: '', ramp_in: '',
-    },
-    {
-      date: '2026-07-01', ac_type: 'B738', ac_ident: 'HL8500',
-      flt_no: '102', from_apt: 'CJU', to_apt: 'ICN',
-      pic: '1+10', picus: '', cop: '', ip: '', tr: '',
-      block: '1+10', night: '', inst: '',
-      app_type: '', to_d: 1, to_n: 0, ld_d: 1, ld_n: 0,
-      remark: '', crew: JSON.stringify([{ name: '김민준', duty: 'F' }]),
-      ramp_out: '', ramp_in: '',
-    },
-    {
-      date: '2026-07-03', ac_type: 'B38M', ac_ident: 'HL8600',
-      flt_no: '501', from_apt: 'ICN', to_apt: 'NRT',
-      pic: '2+15', picus: '', cop: '', ip: '', tr: '',
-      block: '2+15', night: '0+40', inst: '',
-      app_type: '', to_d: 1, to_n: 0, ld_d: 0, ld_n: 1,
-      remark: '', crew: JSON.stringify([{ name: '이서연', duty: 'F' }]),
-      ramp_out: '', ramp_in: '',
-    },
-    {
-      date: '2026-07-03', ac_type: 'B38M', ac_ident: 'HL8600',
-      flt_no: '502', from_apt: 'NRT', to_apt: 'ICN',
-      pic: '2+20', picus: '', cop: '', ip: '', tr: '',
-      block: '2+20', night: '', inst: '',
-      app_type: '', to_d: 1, to_n: 0, ld_d: 1, ld_n: 0,
-      remark: '', crew: JSON.stringify([{ name: '이서연', duty: 'F' }]),
-      ramp_out: '', ramp_in: '',
-    },
-    {
-      date: '2026-07-05', ac_type: 'B738', ac_ident: 'HL8510',
-      flt_no: '205', from_apt: 'GMP', to_apt: 'CJU',
-      pic: '1+00', picus: '', cop: '', ip: '', tr: '',
-      block: '1+00', night: '', inst: '',
-      app_type: '', to_d: 1, to_n: 0, ld_d: 1, ld_n: 0,
-      remark: '', crew: JSON.stringify([{ name: '박지호', duty: 'F' }]),
-      ramp_out: '', ramp_in: '',
-    },
-  ];
-
-  const now = new Date().toISOString();
+export async function getAppSetting(key: string): Promise<string | null> {
   const db = await getDatabase();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = ?`, [key]
+  );
+  return row?.value ?? null;
+}
 
-  await db.withTransactionAsync(async () => {
-    for (let i = 0; i < DUMMY.length; i++) {
-      const e = DUMMY[i];
-      const id = `dummy-${Date.now()}-${i}`;
-      await db.runAsync(
-        `INSERT OR IGNORE INTO logbook
-          (id, date, ac_type, ac_ident, flt_no, from_apt, to_apt,
-           pic, picus, cop, ip, tr, block, night, inst, app_type,
-           to_d, to_n, ld_d, ld_n, remark, crew, ramp_out, ramp_in,
-           sort_order, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [
-          id, e.date, e.ac_type, e.ac_ident, e.flt_no, e.from_apt, e.to_apt,
-          e.pic, e.picus, e.cop, e.ip, e.tr, e.block, e.night, e.inst,
-          e.app_type, e.to_d, e.to_n, e.ld_d, e.ld_n,
-          e.remark, e.crew, e.ramp_out, e.ramp_in,
-          nextSo + i, now,
-        ]
-      );
-    }
-  });
-
-  console.log('[DEV] insertDummyData: 5건 삽입 완료 (sort_order', nextSo, '~', nextSo + DUMMY.length - 1, ')');
+export async function setAppSetting(key: string, value: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)`, [key, value]
+  );
 }

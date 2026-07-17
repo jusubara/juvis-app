@@ -3,6 +3,7 @@ import {
   View, Text, Image, StyleSheet, Animated, Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RED   = '#C41E3A';
 const BG    = '#f0f4f8';
@@ -10,6 +11,7 @@ const DARK  = '#1a2332';
 const MUTED = '#6b7a8d';
 
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
+  const insets     = useSafeAreaInsets();
   const progress   = useRef(new Animated.Value(0)).current;
   const [pct, setPct] = useState(0);
 
@@ -46,18 +48,13 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
 
       {/* ─── 상단: 로그북 이미지 + 로고 + 브랜드 텍스트 ─── */}
       <View style={s.topSection}>
         <Image
           source={require('../../assets/pilot-logbook.png')}
           style={s.logbookImg}
-          resizeMode="contain"
-        />
-        <Image
-          source={require('../../assets/eastar-logo.png')}
-          style={s.logo}
           resizeMode="contain"
         />
         <Text style={s.brand}>MOBILE PILOT&apos;S LOGBOOK</Text>
@@ -98,15 +95,13 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     paddingHorizontal: 32,
-    justifyContent: 'space-between',
-    paddingTop: 80,
-    paddingBottom: 52,
+    justifyContent: 'center',
+    gap: 48,
   },
 
   // 상단
   topSection: { alignItems: 'center', gap: 10 },
   logbookImg: { width: 360, height: 256, marginBottom: 6 },
-  logo: { width: 220, height: 66 },
   brand: {
     fontSize: 11,
     fontWeight: '700',
