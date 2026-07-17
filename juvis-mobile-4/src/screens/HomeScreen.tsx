@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, Modal,
   ActivityIndicator, Alert, ScrollView, PanResponder,
-  LayoutAnimation, UIManager, Platform, Animated, InteractionManager,
+  LayoutAnimation, UIManager, Platform, Image, Animated, InteractionManager,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -1108,7 +1108,7 @@ export default function HomeScreen({ onNavigate, onEdit, refreshTrigger }: Props
         animationType="slide"
       >
         <TouchableOpacity style={s.pdfOverlay} activeOpacity={1} onPress={() => setShowPdfModal(false)}>
-          <View style={[s.pdfSheet, { paddingBottom: insets.bottom }]} onStartShouldSetResponder={() => true}>
+          <View style={[s.pdfSheet, { paddingBottom: 32 + insets.bottom }]} onStartShouldSetResponder={() => true}>
             <View style={s.pdfSheetHandle} />
             <Text style={s.pdfSheetTitle}>PDF 출력 설정</Text>
 
@@ -1333,7 +1333,7 @@ const s = StyleSheet.create({
   pdfSheet: {
     backgroundColor: BG,
     borderTopLeftRadius: 18, borderTopRightRadius: 18,
-    paddingTop: 10, paddingBottom: 32,
+    paddingTop: 10,
     shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12, shadowRadius: 12, elevation: 10,
   },

@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, Image, StyleSheet, Animated, Easing,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 const RED   = '#C41E3A';
 const BG    = '#f0f4f8';
@@ -48,7 +48,7 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
   });
 
   return (
-    <View style={[s.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[s.container, { paddingTop: 80 + insets.top, paddingBottom: 52 + insets.bottom }]}>
 
       {/* ─── 상단: 로그북 이미지 + 로고 + 브랜드 텍스트 ─── */}
       <View style={s.topSection}>
@@ -95,8 +95,7 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     paddingHorizontal: 32,
-    justifyContent: 'center',
-    gap: 48,
+    justifyContent: 'space-between',
   },
 
   // 상단
