@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Providers from "./providers";
+import LogoutButton from "@/components/LogoutButton";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -29,7 +30,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#020c14] text-cyan-100`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <div className="fixed top-3 right-4 z-50">
+            <LogoutButton />
+          </div>
+          {children}
+        </Providers>
       </body>
     </html>
   );

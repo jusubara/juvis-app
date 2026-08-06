@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AssetPnlCard from "@/components/AssetPnlCard";
 
 const modules = [
   {
@@ -165,6 +166,7 @@ export default function Home() {
             {modules.map((mod) => (
               <ModuleCard key={mod.id} mod={mod} />
             ))}
+            <AssetPnlCard />
           </div>
         </section>
 
