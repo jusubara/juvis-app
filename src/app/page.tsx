@@ -16,19 +16,6 @@ const modules = [
     href: "https://eastarjet-pay.vercel.app",
   },
   {
-    id: "logbook",
-    icon: "📒",
-    title: "전자 로그북",
-    titleEn: "Electronic Logbook (OCR)",
-    description: "운항기록부 사진을 업로드하면 Claude Vision이 자동 파싱 후 Supabase에 저장합니다.",
-    status: "ONLINE",
-    statusColor: "text-emerald-400",
-    dotColor: "bg-emerald-400",
-    dotShadow: "0 0 6px #34d399",
-    tag: "FLIGHT",
-    href: "/logbook",
-  },
-  {
     id: "logbook2",
     icon: "✈️",
     title: "로그북 v2",
@@ -42,30 +29,17 @@ const modules = [
     href: "/logbook2",
   },
   {
-    id: "portfolio",
-    icon: "📈",
-    title: "투자 포트폴리오",
-    titleEn: "Investment Portfolio",
-    description: "주식, ETF, 채권 포트폴리오를 통합 관리하고 수익률을 추적합니다.",
+    id: "logbook",
+    icon: "📒",
+    title: "전자 로그북",
+    titleEn: "Electronic Logbook (OCR)",
+    description: "운항기록부 사진을 업로드하면 Claude Vision이 자동 파싱 후 Supabase에 저장합니다.",
     status: "ONLINE",
     statusColor: "text-emerald-400",
     dotColor: "bg-emerald-400",
     dotShadow: "0 0 6px #34d399",
-    tag: "INVEST",
-    href: "/asset",
-  },
-  {
-    id: "game",
-    icon: "🎮",
-    title: "게임 / 밈코인",
-    titleEn: "Gaming & Meme Coins",
-    description: "밈코인 시세 모니터링, 게임 자산 추적, 수익 현황을 분석합니다.",
-    status: "STANDBY",
-    statusColor: "text-yellow-400",
-    dotColor: "bg-yellow-400",
-    dotShadow: "0 0 6px #facc15",
-    tag: "CRYPTO",
-    href: "/game",
+    tag: "FLIGHT",
+    href: "/logbook",
   },
   {
     id: "pdf-toolbox",
@@ -79,6 +53,19 @@ const modules = [
     dotShadow: "0 0 6px #34d399",
     tag: "TOOLS",
     href: "https://pdf-toolbox-inky.vercel.app/",
+  },
+  {
+    id: "game",
+    icon: "🎮",
+    title: "게임 / 밈코인",
+    titleEn: "Gaming & Meme Coins",
+    description: "밈코인 시세 모니터링, 게임 자산 추적, 수익 현황을 분석합니다.",
+    status: "STANDBY",
+    statusColor: "text-yellow-400",
+    dotColor: "bg-yellow-400",
+    dotShadow: "0 0 6px #facc15",
+    tag: "CRYPTO",
+    href: "/game",
   },
   {
     id: "trading",
@@ -163,10 +150,13 @@ export default function Home() {
 
           {/* 2-column grid layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {modules.map((mod) => (
+            {modules.slice(0, 3).map((mod) => (
               <ModuleCard key={mod.id} mod={mod} />
             ))}
             <AssetPnlCard />
+            {modules.slice(3).map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} />
+            ))}
           </div>
         </section>
 
