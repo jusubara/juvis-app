@@ -1,47 +1,12 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { getSupabaseAuth } from '@/lib/supabase-auth';
-
 const ASSET_PNL_URL = 'https://asset-pnl-app.vercel.app';
 
 export default function AssetPnlCard() {
-  const [hasSession, setHasSession] = useState(false);
-
-  useEffect(() => {
-    const supabase = getSupabaseAuth();
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      setHasSession(!!data.session);
-    })();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
-      setHasSession(!!session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  if (!hasSession) return null;
-
-  async function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
-    e.preventDefault();
-    const supabase = getSupabaseAuth();
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) return;
-
-    const { access_token, refresh_token } = data.session;
-    const url = `${ASSET_PNL_URL}/auth/handoff#access_token=${access_token}&refresh_token=${refresh_token}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
   return (
     <a
-      href={`${ASSET_PNL_URL}/auth/handoff`}
-      onClick={handleClick}
-      className="group block"
+      href={ASSET_PNL_URL}
+      target="_blank"
       rel="noopener noreferrer"
+      className="group block"
     >
       <div className="juvis-card cursor-pointer">
         <div className="flex items-start justify-between mb-4">
